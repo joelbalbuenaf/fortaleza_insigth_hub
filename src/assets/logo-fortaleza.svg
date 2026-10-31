@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 92" role="img" aria-label="Fortaleza Inmuebles">
+  <title>Fortaleza Inmuebles (logo provisorio)</title>
+  <!-- PLACEHOLDER: reemplazar por el logo oficial de Fortaleza Inmuebles S.A. -->
+  <g fill="none" stroke="#1b3a66" stroke-width="6">
+    <path d="M14 78V34l22-16 22 16v44" />
+    <path d="M26 78V52h20v26" />
+  </g>
+  <text x="74" y="46" font-family="Montserrat, sans-serif" font-size="30" font-weight="800" fill="#1b3a66">FORTALEZA</text>
+  <text x="76" y="70" font-family="Montserrat, sans-serif" font-size="17" font-weight="500" letter-spacing="3.5" fill="#4f7aa8">INMUEBLES</text>
+</svg>

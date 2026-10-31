@@ -1,0 +1,270 @@
+// Mora, deserción y riesgo de abandono (solo servidor). Datos ILUSTRATIVOS.
+//
+// Tres miradas distintas y conviene no confundirlas:
+//   - MORA: cuotas impagas pendientes hoy. Es un stock.
+//   - DESERCIÓN: contratos que ya se cayeron. Es un hecho consumado.
+//   - RIESGO: socios que todavía están, pero se parecen a los que desertaron. Es una predicción,
+//     y el scoring expone sus factores para que una persona pueda discutirla.
+import { nombrePlan, type Canal, type Plan } from "@/lib/data/filtros";
+import { etiquetaPeriodo, periodos, rango, desplazar } from "@/lib/data/periodos";
+import { redondear } from "@/lib/data/random";
+import {
+  antiguedadMeses,
+  atrasoAl,
+  ATRASO_LIMITE,
+  cobradoEnRango,
+  cuotasDe,
+  emitido,
+  esActivo,
+  socios,
+  type Socio,
+} from "./datos";
+import { filtrar, PERIODO_ACTUAL, type FiltroCartera } from "./consultas";
+
+const mm = (guaranies: number, d = 0) => redondear(guaranies / 1_000_000, d);
+
+/** Cuota vigente del socio al cierre del período. */
+function cuotaVigente(s: Socio, hasta: string) {
+  return emitido(s, hasta) || s.aporteMensual;
+}
+
+// ── Mora por tramo de atraso ───────────────────────────────────────────────────────────
+
+const TRAMOS = [
+  { clave: "1-2", nombre: "1 a 2 cuotas", min: 1, max: 2 },
+  { clave: "3-4", nombre: "3 a 4 cuotas", min: 3, max: 4 },
+  { clave: "5-6", nombre: "5 a 6 cuotas", min: 5, max: ATRASO_LIMITE - 1 },
+] as const;
+
+export function moraPorTramo(f: FiltroCartera = PERIODO_ACTUAL) {
+  const activos = filtrar(f).filter((s) => esActivo(s, f.hasta));
+  return TRAMOS.map((t) => {
+    const lista = activos.filter((s) => {
+      const a = atrasoAl(s, f.hasta);
+      return a >= t.min && a <= t.max;
+    });
+    return {
+      tramo: t.clave,
+      nombre: t.nombre,
+      socios: lista.length,
+      cuotas: lista.reduce((n, s) => n + atrasoAl(s, f.hasta), 0),
+      saldoMM: mm(lista.reduce((n, s) => n + atrasoAl(s, f.hasta) * cuotaVigente(s, f.hasta), 0)),
+      // A más atraso, menos chance de recuperar: es el tramo que hay que atacar primero.
+      riesgoDeCaida: t.min >= 5 ? "alto" : t.min >= 3 ? "medio" : "bajo",
+    };
+  });
+}
+
+/** Evolución mensual de la mora: saldo y % sobre lo emitido del mes. */
+export function evolucionMora(f: FiltroCartera = PERIODO_ACTUAL) {
+  const lista = filtrar(f);
+  return rango(f.desde, f.hasta).map((periodo) => {
+    const activos = lista.filter((s) => esActivo(s, periodo));
+    const saldo = activos.reduce((t, s) => t + atrasoAl(s, periodo) * cuotaVigente(s, periodo), 0);
+    const emi = activos.reduce((t, s) => t + emitido(s, periodo), 0);
+    return {
+      periodo,
+      mes: etiquetaPeriodo(periodo),
+      saldoMM: mm(saldo),
+      pctFacturacion: emi ? redondear((saldo / emi) * 100, 1) : 0,
+      sociosEnMora: activos.filter((s) => atrasoAl(s, periodo) > 0).length,
+    };
+  });
+}
+
+// ── Deserción por cohorte de alta ──────────────────────────────────────────────────────
+
+/**
+ * Supervivencia por cohorte: de los socios que entraron en cada año, qué proporción seguía
+ * activa a los 12, 24 y 36 meses. Solo se cuentan las cohortes que ya tuvieron tiempo de
+ * cumplir el hito; si no, el dato queda en null en lugar de mentir con un número parcial.
+ */
+export function cohortesDesercion() {
+  const ultimo = periodos[periodos.length - 1]!;
+  const anios = [...new Set(socios.map((s) => Number(s.alta.slice(0, 4))))]
+    .filter((a) => a >= 2022)
+    .sort();
+
+  return anios.map((anio) => {
+    const cohorte = socios.filter((s) => Number(s.alta.slice(0, 4)) === anio);
+    const hito = (meses: number) => {
+      // ¿Toda la cohorte llegó a cumplir ese hito dentro del calendario?
+      const corte = desplazar(`${anio}-12`, meses);
+      if (corte > ultimo) return null;
+      const vivos = cohorte.filter((s) => !s.baja || s.baja > desplazar(s.alta, meses)).length;
+      return redondear((vivos / cohorte.length) * 100, 1);
+    };
+    return {
+      cohorte: String(anio),
+      socios: cohorte.length,
+      vivos12: hito(12),
+      vivos24: hito(24),
+      vivos36: hito(36),
+      // Deserción observada hasta hoy, sin importar el hito.
+      desercionActualPct: redondear(
+        (cohorte.filter((s) => s.baja).length / cohorte.length) * 100,
+        1,
+      ),
+    };
+  });
+}
+
+/** Deserción agrupada por una dimensión del socio, para ver dónde se pierde más. */
+export function desercionPor(dimension: "plan" | "canal" | "sucursal") {
+  const claves = [...new Set(socios.map((s) => s[dimension]))].sort();
+  return claves
+    .map((clave) => {
+      const lista = socios.filter((s) => s[dimension] === clave);
+      const bajas = lista.filter((s) => s.baja);
+      return {
+        clave: String(clave),
+        nombre: dimension === "plan" ? nombrePlan[clave as Plan] : String(clave),
+        socios: lista.length,
+        bajas: bajas.length,
+        desercionPct: redondear((bajas.length / lista.length) * 100, 1),
+        /** Cuánto aportaba por mes lo que se perdió. */
+        cuotaPerdidaMM: mm(bajas.reduce((t, s) => t + s.aporteMensual, 0)),
+        /** Antigüedad típica al momento de la baja. */
+        mesesHastaLaBaja: bajas.length
+          ? Math.round(bajas.reduce((t, s) => t + antiguedadMeses(s, s.baja!), 0) / bajas.length)
+          : 0,
+      };
+    })
+    .sort((a, b) => b.desercionPct - a.desercionPct);
+}
+
+// ── Riesgo de deserción (scoring con factores explícitos) ──────────────────────────────
+
+export type FactorRiesgo = { nombre: string; valor: string; aporte: number; explicacion: string };
+
+/** Peso del canal de alta en el riesgo, según lo que muestra la deserción observada. */
+const RIESGO_CANAL: Record<Canal, number> = {
+  Web: 14,
+  Eventos: 10,
+  "App Fideliza": 6,
+  Asesor: 2,
+  Referido: 0,
+};
+
+/**
+ * Puntaje 0–100 de riesgo de que el socio abandone el plan. No es un modelo entrenado: es una
+ * suma de factores explícitos, elegidos porque son los que mueven la deserción en estos datos.
+ * Se muestra con sus factores justamente para que se pueda discutir cada uno.
+ */
+export function riesgoDeSocio(s: Socio, hasta: string) {
+  const atraso = atrasoAl(s, hasta);
+  const antiguedad = antiguedadMeses(s, hasta);
+  const { emitidas, pagadas } = cuotasDe(s, hasta);
+  const cumplimiento = emitidas ? pagadas / emitidas : 1;
+
+  const fAtraso = Math.min(45, atraso * 13);
+  const fAntiguedad = antiguedad <= 12 ? 20 : antiguedad <= 36 ? 10 : antiguedad <= 60 ? 4 : 0;
+  const fCumplimiento = Math.min(20, Math.round((1 - cumplimiento) * 60));
+  const fCanal = RIESGO_CANAL[s.canal];
+  const fPlan = s.plan === "Amplia" ? 6 : s.plan === "Adicional" ? 3 : 0;
+  // Ya adjudicado: tiene mucho más que perder, así que el riesgo baja.
+  const fAdjudicado = s.adjudicado && s.adjudicado <= hasta ? -18 : 0;
+
+  const puntaje = Math.max(
+    0,
+    Math.min(100, fAtraso + fAntiguedad + fCumplimiento + fCanal + fPlan + fAdjudicado),
+  );
+
+  const factores: FactorRiesgo[] = [
+    {
+      nombre: "Atraso actual",
+      valor: `${atraso} cuota${atraso === 1 ? "" : "s"}`,
+      aporte: Math.round(fAtraso),
+      explicacion: `Con ${ATRASO_LIMITE} cuotas impagas el contrato se cae; es el factor que más pesa.`,
+    },
+    {
+      nombre: "Antigüedad",
+      valor: `${Math.floor(antiguedad / 12)} a ${antiguedad % 12} m`,
+      aporte: fAntiguedad,
+      explicacion: "El primer año concentra la mayoría de las bajas.",
+    },
+    {
+      nombre: "Cumplimiento histórico",
+      valor: `${redondear(cumplimiento * 100, 1)}% (${pagadas}/${emitidas})`,
+      aporte: fCumplimiento,
+      explicacion: "Cuotas pagadas sobre emitidas desde el alta.",
+    },
+    {
+      nombre: "Canal de alta",
+      valor: s.canal,
+      aporte: fCanal,
+      explicacion: "Los referidos y la venta por asesor retienen mejor que la web y los eventos.",
+    },
+    {
+      nombre: "Plan",
+      valor: nombrePlan[s.plan],
+      aporte: fPlan,
+      explicacion: "La cuota más alta del Plan Amplia es más difícil de sostener.",
+    },
+    ...(fAdjudicado
+      ? [
+          {
+            nombre: "Ya adjudicado",
+            valor: etiquetaPeriodo(s.adjudicado!),
+            aporte: fAdjudicado,
+            explicacion: "Quien ya recibió su unidad tiene mucho más que perder si abandona.",
+          },
+        ]
+      : []),
+  ];
+
+  return {
+    contrato: s.contrato,
+    plan: s.plan,
+    sucursal: s.sucursal,
+    canal: s.canal,
+    barrio: s.barrio,
+    atraso,
+    antiguedadMeses: antiguedad,
+    cuotaGs: cuotaVigente(s, hasta),
+    aportadoMM: mm(s.pagadoPrevio + cobradoEnRango(s, periodos[0]!, hasta), 1),
+    puntaje,
+    nivel: puntaje >= 60 ? "Alto" : puntaje >= 35 ? "Medio" : "Bajo",
+    factores,
+  };
+}
+
+export type RiesgoSocio = ReturnType<typeof riesgoDeSocio>;
+
+/**
+ * Socios a contactar, ordenados por lo que está en juego: riesgo × cuota mensual. Un socio de
+ * riesgo medio con cuota alta puede importar más que uno de riesgo alto con cuota chica.
+ */
+export function prioridadDeContacto(f: FiltroCartera = PERIODO_ACTUAL, limite = 25) {
+  const activos = filtrar(f).filter((s) => esActivo(s, f.hasta) && atrasoAl(s, f.hasta) > 0);
+  return activos
+    .map((s) => {
+      const r = riesgoDeSocio(s, f.hasta);
+      return {
+        ...r,
+        /** Recaudación mensual en juego, en guaraníes. */
+        enJuegoGs: Math.round((r.puntaje / 100) * r.cuotaGs),
+      };
+    })
+    .sort((a, b) => b.enJuegoGs - a.enJuegoGs)
+    .slice(0, limite);
+}
+
+/** Resumen de la cartera por nivel de riesgo, con la recaudación mensual asociada. */
+export function resumenRiesgo(f: FiltroCartera = PERIODO_ACTUAL) {
+  const activos = filtrar(f).filter((s) => esActivo(s, f.hasta));
+  const niveles = ["Alto", "Medio", "Bajo"] as const;
+  const conRiesgo = activos.map((s) => riesgoDeSocio(s, f.hasta));
+  return niveles.map((nivel) => {
+    const lista = conRiesgo.filter((r) => r.nivel === nivel);
+    return {
+      nivel,
+      socios: lista.length,
+      sociosPct: activos.length ? redondear((lista.length / activos.length) * 100, 1) : 0,
+      cuotaMensualMM: mm(lista.reduce((t, r) => t + r.cuotaGs, 0)),
+      atrasoPromedio: lista.length
+        ? redondear(lista.reduce((t, r) => t + r.atraso, 0) / lista.length, 1)
+        : 0,
+    };
+  });
+}

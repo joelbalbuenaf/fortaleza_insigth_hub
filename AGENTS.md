@@ -1,0 +1,52 @@
+## Convenciones del proyecto
+
+- Node 22 (nvm). Instalar con `npm install` (el `.npmrc` del repo activa `legacy-peer-deps`).
+- `HUB_USUARIO` y `HUB_CLAVE` son **obligatorias**: `src/start.ts` aborta el arranque si faltan.
+  No agregar credenciales por defecto en el código: el Hub muestra la cartera de socios.
+- **Dos niveles de veracidad, y no se mezclan en un mismo número**: `publico` (catálogo de
+  proyectos: nombre, año, estado y dirección, del sitio de Fortaleza) e `ilustrativo` (todo lo
+  demás: socios, aportes, mora, deserción, adjudicaciones, obra, mercado). `mixto` es estructura
+  pública con cantidades supuestas. Todo gráfico (`ChartSpec.fuente`), pantalla (`PageHeader
+  fuente`) y resultado de herramienta declara su fuente.
+- La cartera vive solo en `src/server/` (la import-protection de Vite falla el build si el
+  cliente la importa). Las pantallas la reciben por server functions (`src/lib/hub/api.ts`)
+  protegidas por el login. Desde componentes, importar de `src/server/` solo con `import type`.
+  Si un componente necesita una constante del servidor, pasarla por la respuesta de la server
+  function, no importarla (ver `proporcionAObra` en `obtenerObra`).
+- Las etiquetas de las herramientas viven en `src/lib/fide/etiquetas.ts`, no en `tools.ts`: el
+  chip del chat las necesita en el cliente y `tools.ts` importa `src/server/`.
+- **Unidades**: los aportes se guardan en guaraníes y se muestran en millones de guaraníes
+  (Gs MM); los precios de m² en USD. Socios, unidades y adjudicaciones son conteos: nunca se
+  suman con montos. Período actual: Ene–Sep 2026 vs. Ene–Sep 2025; el calendario va de Ene 2022 a
+  Sep 2026 (`src/lib/data/periodos.ts`).
+- **La mora se mide sobre el SALDO pendiente al cierre** (cuotas impagas valorizadas, ver
+  `saldoEnMora`), no como "emitido − cobrado" de una ventana: las regularizaciones de meses
+  anteriores caen dentro de la ventana y la dejan en casi cero. Por eso la efectividad de
+  cobranza puede pasar del 100% en un período, y está bien.
+- Regularizar una cuota vieja se paga **al valor de la cuota vigente**, no al de entonces: el
+  dinero cobrado de un socio puede superar al emitido, aunque la cantidad de cuotas pagadas nunca.
+  El invariante va en cuotas, no en guaraníes.
+- A las 7 cuotas impagas (`ATRASO_LIMITE`) el contrato se cae. La población de pago es **bimodal**
+  a propósito (una mayoría cumplidora y una minoría irregular): con una sola distribución la mora
+  del agregado queda irrealmente cerca de cero.
+- Los socios que entraron antes de Ene 2022 traen su historia en `pagadoPrevio` y su antigüedad
+  se mide con `mesesEntre`, no con el índice del calendario.
+- **Fide** (`POST /api/chat`): con `ANTHROPIC_API_KEY` usa Claude con herramientas
+  (`src/lib/fide/`); sin key responde en modo demo con las mismas herramientas, sin IA. Los hilos
+  se guardan en localStorage.
+- **Gráficos**: Fide solo elige qué graficar; los valores siempre los calcula el servidor
+  (`src/server/graficos.ts`). Nunca graficar números generados por el modelo.
+- **Tres reglas del prompt que no se negocian** (y que `src/test/fide.test.ts` verifica):
+  no prometer rentabilidades ni plazos de adjudicación (la espera es probabilística: sorteo con
+  igual chance para todos los socios al día, licitación por oferta); identificar socios por
+  número de contrato y nunca por nombre; declarar la fuente de cada cifra.
+- El **simulador de planes** (`src/lib/fide/simulador.ts`) es un porteo del cuotero Flask
+  (`cuotero_prime/app.py: generate_full_schedule`). Se mantiene su aritmética a propósito, incluida
+  la capitalización del interés del tramo de obra y los dos saldos en paralelo. Si se toca, correr
+  `src/test/simulador.test.ts`: compara contra la salida del Python fila por fila.
+- La presentación ejecutiva vive en `/presentacion`, fuera de `AppShell`; un `ScaledSlide` de
+  1920×1080 sirve para lienzo, vista general e impresión. Las diapositivas **no muestran cifras
+  de la cartera**: es el lugar donde un número inventado se confunde con un dato.
+- Mapas: MapLibre GL con teselas OpenFreeMap (sin key). Los proyectos y los socios se ubican en
+  el centro del barrio con un desplazamiento chico, no en su dirección real.
+- Los logos de `src/assets/` son placeholders en SVG hasta que lleguen los oficiales.
