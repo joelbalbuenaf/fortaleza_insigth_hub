@@ -4,7 +4,12 @@ import { esRutaPublica, exigirCredenciales, verificarSesion } from "./lib/auth";
 import { renderErrorPage } from "./lib/error-page";
 
 // Sin HUB_USUARIO y HUB_CLAVE el servidor no levanta: el Hub muestra datos de socios.
-exigirCredenciales();
+//
+// Solo en el servidor, y es importante: este módulo también se evalúa en el navegador, donde
+// `process.env` no existe. Un throw acá rompe la hidratación y la app queda sin ningún
+// controlador de eventos —los botones dejan de responder— sin error visible en la página.
+// `import.meta.env.SSR` es false en el bundle de cliente, así que esto se elimina del build.
+if (import.meta.env.SSR) exigirCredenciales();
 
 const errorMiddleware = createMiddleware().server(async ({ next }) => {
   try {
