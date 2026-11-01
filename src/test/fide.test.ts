@@ -89,6 +89,14 @@ describe("herramientas de Fide", () => {
     for (const g of graficosDisponibles) expect(SYSTEM_PROMPT).toContain(g);
   });
 
+  it("el prompt exige leer cada gráfico en el texto", () => {
+    // Sin esto el modelo manda el gráfico y resuelve con una línea; el gráfico lo dibuja el
+    // sistema, pero la interpretación es lo único que el modelo aporta.
+    expect(SYSTEM_PROMPT).toContain("NUNCA dejes un gráfico mudo");
+    expect(SYSTEM_PROMPT).toContain("LECTURA");
+    expect(SYSTEM_PROMPT).toContain("composición");
+  });
+
   it("el prompt nombra las tres situaciones y los dos aportes", () => {
     for (const s of situaciones) expect(SYSTEM_PROMPT).toContain(s);
     // Los valores van desde la constante, así que no pueden quedar desfasados del modelo.
@@ -170,8 +178,19 @@ describe("modo demo", () => {
       await responderEnDemo(pregunta, f.w);
       expect(f.herramientasUsadas).toContain(herramienta);
       const { texto, sugerencias } = separarSugerencias(f.texto());
-      expect(texto.length).toBeGreaterThan(80);
       expect(sugerencias).toHaveLength(3);
+      // Una respuesta no es una tabla suelta: quien pregunta ya tiene los números en las
+      // pantallas, lo que no tiene es la lectura. Y un gráfico sin texto que lo lea es trabajo
+      // a medias, así que el piso sube cuando la respuesta trae gráficos.
+      expect(texto.length, `${pregunta} (${f.graficos.length} gráficos)`).toBeGreaterThan(
+        f.graficos.length ? 1000 : 600,
+      );
+      // Fuera de las tablas tiene que haber prosa, no solo filas de datos.
+      const prosa = texto
+        .split("\n")
+        .filter((l) => !l.trimStart().startsWith("|"))
+        .join(" ");
+      expect(prosa.length, pregunta).toBeGreaterThan(400);
     });
 
   it("responde a un número de contrato con su ficha", async () => {
