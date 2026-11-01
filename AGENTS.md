@@ -54,6 +54,13 @@
   `logo-fortaleza-blanco.png` (fondos oscuros). La paleta de series de los gráficos
   (`--series-*`) NO es la de marca a propósito: está validada para daltonismo y contraste.
   `src/assets/fide.svg` es el único placeholder que queda.
+- **Calce de obra**: los aportes se asignan mes a mes, solo a las torres que estaban en
+  construcción ese mes, y al ritmo en que su cronograma consume la plata (con un adelanto
+  acotado y tope por costo). Lo que no absorben va a `reserva`. Sin eso aparecían dos absurdos:
+  aportes asignados mayores al costo total de las obras, y una torre 5% construida figurando 96%
+  fondeada. `src/test/obra.test.ts` cubre ambos.
+- Los montos en Gs MM llegan a 14 caracteres: `Kpi` baja el cuerpo por tramos de largo para que
+  entren en un renglón. Al agregar una métrica nueva, verificar que `scrollWidth <= clientWidth`.
 - Las diapositivas usan un lienzo fijo de 1920×1080 con `overflow: hidden`: si el contenido
   desborda, el pie desaparece sin avisar. Al editarlas, medir el `scrollHeight` del
   `.slide-content` contra su `clientHeight`.

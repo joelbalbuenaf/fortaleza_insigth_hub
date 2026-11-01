@@ -11,11 +11,12 @@ import {
   etiquetaCorta,
   mesesEntre,
   periodos,
+  rango,
   ULTIMO_PERIODO,
 } from "@/lib/data/periodos";
 import { proyectos, proyectosEnObra, type Proyecto } from "@/lib/data/proyectos";
 import { crearAzar, entre, redondear } from "@/lib/data/random";
-import { cobradoEnRango, socios } from "./socios/datos";
+import { cobrado, socios } from "./socios/datos";
 import { serieMensualCartera } from "./socios/consultas";
 
 const mm = (guaranies: number, d = 0) => redondear(guaranies / 1_000_000, d);
@@ -67,20 +68,85 @@ function avanceTeorico(fraccionTiempo: number) {
 /** Meses de obra de una torre, según su cantidad de pisos. */
 const mesesDeObra = (pisos: number) => Math.round(26 + pisos * 0.9);
 
-export function estadoDeObra(hasta = ULTIMO_PERIODO): EstadoObra[] {
-  // Los aportes que van a obra se reparten entre los proyectos activos, ponderados por su costo.
-  const recaudadoTotal = socios.reduce(
-    (t, s) => t + cobradoEnRango(s, periodos[0]!, ULTIMO_PERIODO),
-    0,
-  );
-  const aObra = recaudadoTotal * PROPORCION_A_OBRA;
-  const costos = proyectosEnObra.map((p) => m2De(p) * COSTO_M2_GS);
-  const costoTotal = costos.reduce((t, c) => t + c, 0);
+const costoDe = (p: Proyecto) => m2De(p) * COSTO_M2_GS;
+/** Ventana de obra de un proyecto: desde que arranca hasta la entrega (diciembre del año). */
+function ventanaDeObra(p: Proyecto) {
+  const fin = `${p.anio}-12`;
+  return { inicio: desplazar(fin, -mesesDeObra(p.pisos)), fin };
+}
 
-  return proyectosEnObra.map((p, i) => {
+/** Cuánto de su costo consume una obra en un mes dado de su cronograma, en guaraníes. */
+function costoDelMes(costo: number, meses: number, mesDeObra: number) {
+  const antes = avanceTeorico((mesDeObra - 1) / meses);
+  const ahora = avanceTeorico(mesDeObra / meses);
+  return (costo * (ahora - antes)) / 100;
+}
+
+/** Cuánto puede adelantarse el fondeo respecto del ritmo del cronograma. */
+const ADELANTO_MAXIMO = 1.2;
+
+/**
+ * Reparte, mes a mes, la plata que va a obra entre los proyectos que estaban EN CONSTRUCCIÓN ese
+ * mes, al ritmo en que el cronograma la consume.
+ *
+ * Tres cosas que el modelo tiene que respetar, y que fueron apareciendo de a una:
+ *
+ *  - **Mensual, no sobre el acumulado.** En el calendario Fortaleza entregó cuatro torres, y esa
+ *    obra también se pagó con estos aportes. Repartir todo lo recaudado entre las cinco torres
+ *    que siguen en obra les asignaba plata ya gastada y dejaba el calce positivo por
+ *    construcción, o sea sin significado.
+ *  - **Al ritmo del cronograma.** Una obra no absorbe plata más rápido de lo que la gasta: en
+ *    cada mes puede tomar hasta lo que su curva de avance consume ese mes, con un adelanto
+ *    acotado. Sin esto, una torre que entrega en 2029 y está 5% construida aparecía 96% fondeada.
+ *  - **Con tope por costo.** A una obra nunca se le asigna más que lo que cuesta.
+ *
+ * Lo que ningún proyecto absorbe va a `reserva`: en el negocio es lo que financia los terrenos y
+ * las torres que todavía no arrancaron.
+ */
+function asignacionPorProyecto(hasta: string) {
+  const ventanas = proyectos.map((p) => ({
+    id: p.id,
+    costo: costoDe(p),
+    meses: mesesDeObra(p.pisos),
+    ...ventanaDeObra(p),
+  }));
+  const asignado = new Map<string, number>(proyectos.map((p) => [p.id, 0]));
+  let reserva = 0;
+
+  for (const periodo of rango(periodos[0]!, hasta)) {
+    let disponible = socios.reduce((t, s) => t + cobrado(s, periodo), 0) * PROPORCION_A_OBRA;
+    if (disponible <= 0) continue;
+
+    // Cupo del mes de cada obra activa: lo que su cronograma consume, más el adelanto permitido.
+    const cupos = ventanas
+      .filter((v) => v.inicio <= periodo && periodo <= v.fin)
+      .map((v) => {
+        const mesDeObra = mesesEntre(v.inicio, periodo) + 1;
+        const porCronograma = costoDelMes(v.costo, v.meses, mesDeObra) * ADELANTO_MAXIMO;
+        const porCosto = v.costo - (asignado.get(v.id) ?? 0);
+        return { id: v.id, cupo: Math.max(0, Math.min(porCronograma, porCosto)) };
+      })
+      .filter((x) => x.cupo > 1);
+
+    const cupoTotal = cupos.reduce((t, x) => t + x.cupo, 0);
+    if (cupoTotal > 0) {
+      const reparto = Math.min(disponible, cupoTotal);
+      for (const { id, cupo } of cupos)
+        asignado.set(id, (asignado.get(id) ?? 0) + (reparto * cupo) / cupoTotal);
+      disponible -= reparto;
+    }
+    reserva += disponible;
+  }
+  return { asignado, reserva };
+}
+
+export function estadoDeObra(hasta = ULTIMO_PERIODO): EstadoObra[] {
+  const { asignado } = asignacionPorProyecto(hasta);
+
+  return proyectosEnObra.map((p) => {
     const azar = crearAzar(`obra-${p.id}`);
     const m2 = m2De(p);
-    const costo = costos[i]!;
+    const costo = costoDe(p);
     const meses = mesesDeObra(p.pisos);
     // La entrega prevista es en diciembre del año publicado.
     const finPrevisto = `${p.anio}-12`;
@@ -91,9 +157,9 @@ export function estadoDeObra(hasta = ULTIMO_PERIODO): EstadoObra[] {
     const desvio = entre(azar, -11, 5);
     const avance = redondear(Math.max(0, Math.min(100, plan + desvio)), 1);
 
-    const asignado = costoTotal ? (aObra * costo) / costoTotal : 0;
+    const asignadoAlProyecto = asignado.get(p.id) ?? 0;
     const ejecutado = (costo * avance) / 100;
-    const calce = asignado - ejecutado;
+    const calce = asignadoAlProyecto - ejecutado;
     const desvioPuntos = redondear(avance - plan, 1);
 
     return {
@@ -109,7 +175,7 @@ export function estadoDeObra(hasta = ULTIMO_PERIODO): EstadoObra[] {
       avancePct: avance,
       avancePlanPct: plan,
       desvioPuntos,
-      asignadoMM: mm(asignado),
+      asignadoMM: mm(asignadoAlProyecto),
       ejecutadoMM: mm(ejecutado),
       calceMM: mm(calce),
       mesesRestantes,
@@ -121,6 +187,7 @@ export function estadoDeObra(hasta = ULTIMO_PERIODO): EstadoObra[] {
 /** Resumen de la obra en curso. */
 export function resumenObra(hasta = ULTIMO_PERIODO) {
   const obras = estadoDeObra(hasta);
+  const { reserva } = asignacionPorProyecto(hasta);
   const costo = obras.reduce((t, o) => t + o.costoMM, 0);
   const asignado = obras.reduce((t, o) => t + o.asignadoMM, 0);
   const ejecutado = obras.reduce((t, o) => t + o.ejecutadoMM, 0);
@@ -132,6 +199,8 @@ export function resumenObra(hasta = ULTIMO_PERIODO) {
     asignadoMM: asignado,
     ejecutadoMM: ejecutado,
     calceMM: redondear(asignado - ejecutado, 0),
+    /** Aportes que la obra en curso no absorbe: financian terrenos y proyectos por arrancar. */
+    reservaMM: mm(reserva),
     avanceMedioPct: obras.length
       ? redondear(obras.reduce((t, o) => t + o.avancePct, 0) / obras.length, 1)
       : 0,

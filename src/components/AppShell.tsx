@@ -211,7 +211,20 @@ export function Kpi({
         <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
         {serie && <Sparkline valores={serie} />}
       </div>
-      <p className="mt-1 whitespace-nowrap font-display text-2xl font-bold xl:text-3xl">{value}</p>
+      {/* Los montos en Gs MM llegan a 14 caracteres ("Gs 409.835 MM") y se salían de la tarjeta:
+          con `whitespace-nowrap` el texto desbordaba en lugar de ajustarse. Se baja el cuerpo
+          por tramos de largo para que entre siempre en un renglón. */}
+      <p
+        className={`mt-1 whitespace-nowrap font-display font-bold ${
+          value.length > 12
+            ? "text-lg xl:text-xl"
+            : value.length > 9
+              ? "text-xl xl:text-2xl"
+              : "text-2xl xl:text-3xl"
+        }`}
+      >
+        {value}
+      </p>
       {delta !== undefined && delta !== null && (
         <p
           className={`mt-1 flex items-center gap-1 text-xs font-medium ${bueno ? "text-success" : "text-destructive"}`}

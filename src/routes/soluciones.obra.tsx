@@ -30,7 +30,7 @@ function Page() {
         fuente="mixto"
       />
       <Contenido>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <Kpi
             label="Costo total en obra"
             value={gs(r.costoTotalMM)}
@@ -54,6 +54,11 @@ function Page() {
                 ? "Los aportes cubren lo ejecutado"
                 : "La obra va por delante del fondeo"
             }
+          />
+          <Kpi
+            label="Reserva"
+            value={gs(r.reservaMM)}
+            hint="Aportes que la obra en curso no absorbe: terrenos y torres por arrancar"
           />
         </div>
 
