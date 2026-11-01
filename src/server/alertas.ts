@@ -33,18 +33,19 @@ export function detectarAlertas(): Alerta[] {
   // ── Mora ────────────────────────────────────────────────────────────────────────────
   const tramos = moraPorTramo();
   const graves = tramos.filter((t) => t.riesgoDeCaida !== "bajo");
+  const contratosGraves = graves.reduce((t, x) => t + x.contratos, 0);
   const sociosGraves = graves.reduce((t, x) => t + x.socios, 0);
-  if (sociosGraves > 0)
+  if (contratosGraves > 0)
     out.push({
       id: "mora-grave",
-      severidad: sociosGraves > 150 ? "alta" : "media",
+      severidad: contratosGraves > 150 ? "alta" : "media",
       area: "Mora",
       fuente: "ilustrativo",
-      titulo: `${sociosGraves} socios con 3 o más cuotas impagas`,
+      titulo: `${contratosGraves} contratos con 3 o más cuotas impagas`,
       detalle: `Saldo de Gs ${n(
         graves.reduce((t, x) => t + x.saldoMM, 0),
         0,
-      )} MM. A las ${7} cuotas el contrato se cae: es el grupo con menos chance de recuperarse solo.`,
+      )} MM en manos de ${sociosGraves} socios. A las ${7} cuotas el contrato se cae: es el grupo con menos chance de recuperarse solo.`,
       pregunta:
         "¿A qué socios en mora conviene contactar primero y cuánta recaudación está en juego?",
       enlace: "/soluciones/cartera-salud",
@@ -52,14 +53,14 @@ export function detectarAlertas(): Alerta[] {
 
   const riesgo = resumenRiesgo();
   const alto = riesgo.find((x) => x.nivel === "Alto");
-  if (alto && alto.socios > 0)
+  if (alto && alto.contratos > 0)
     out.push({
       id: "riesgo-alto",
       severidad: "media",
       area: "Mora",
       fuente: "ilustrativo",
-      titulo: `${alto.socios} socios con riesgo alto de abandonar el plan`,
-      detalle: `Son el ${n(alto.sociosPct)}% de los activos y representan Gs ${n(alto.cuotaMensualMM, 0)} MM de cuota mensual. Atraso promedio: ${n(alto.atrasoPromedio)} cuotas.`,
+      titulo: `${alto.contratos} contratos con riesgo alto de caerse del plan`,
+      detalle: `Son el ${n(alto.contratosPct)}% de los activos, de ${alto.socios} socios distintos, y representan Gs ${n(alto.cuotaMensualMM, 0)} MM de cuota mensual. Atraso promedio: ${n(alto.atrasoPromedio)} cuotas.`,
       pregunta: "¿Qué factores explican el riesgo de deserción y dónde se concentra?",
       enlace: "/soluciones/cartera-salud",
     });
@@ -177,7 +178,7 @@ export function detectarAlertas(): Alerta[] {
       severidad: adj.aniosParaVaciarLaCola > 12 ? "media" : "baja",
       area: "Adjudicaciones",
       fuente: "ilustrativo",
-      titulo: `${n(adj.elegiblesEnEspera, 0)} socios elegibles esperando adjudicación`,
+      titulo: `${n(adj.elegiblesEnEspera, 0)} contratos elegibles esperando adjudicación`,
       detalle: `Al ritmo de ${n(adj.adjudicadosPorMes)} adjudicaciones por mes, la cola actual tardaría unos ${n(adj.aniosParaVaciarLaCola)} años. Es una división, no un plazo prometido: la cola crece con las altas y el ritmo depende de las obras.`,
       pregunta: "¿Cómo viene la cola de adjudicación y qué espera tienen los socios?",
       enlace: "/soluciones/adjudicaciones",

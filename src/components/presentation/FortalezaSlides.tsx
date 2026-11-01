@@ -268,7 +268,7 @@ function Adjudicaciones({ index }: { index: number }) {
             ni cuánto pagaron.
           </p>
           <p className="slide-caption" style={{ color: "var(--slide-muted)" }}>
-            El Hub lo calcula como cupos del acto sobre socios elegibles.
+            El Hub lo calcula como cupos del acto sobre contratos elegibles.
           </p>
         </article>
         <article className="fz-card">

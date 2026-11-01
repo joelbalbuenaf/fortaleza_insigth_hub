@@ -126,7 +126,7 @@ export function construirGrafico(p: ParametrosGrafico): ChartSpec {
       return ilustrativo({
         titulo: titulo(`Altas y bajas de contratos${sufijo}`),
         tipo: "barras",
-        unidad: "socios",
+        unidad: "contratos",
         x: "mes",
         datos: altasYBajas(f),
         series: [

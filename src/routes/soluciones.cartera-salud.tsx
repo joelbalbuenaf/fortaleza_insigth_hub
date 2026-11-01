@@ -47,14 +47,14 @@ function Page() {
             <Kpi
               key={n.nivel}
               label={`Riesgo ${n.nivel.toLowerCase()}`}
-              value={fmtNumero(n.socios, 0)}
-              hint={`${fmtNumero(n.sociosPct)}% de los activos · Gs ${fmtNumero(n.cuotaMensualMM, 0)} MM de cuota mensual`}
+              value={fmtNumero(n.contratos, 0)}
+              hint={`${fmtNumero(n.contratosPct)}% de los contratos activos, de ${fmtNumero(n.socios, 0)} socios · Gs ${fmtNumero(n.cuotaMensualMM, 0)} MM de cuota mensual`}
             />
           ))}
           <Kpi
             label="En juego al mes"
             value={`Gs ${fmtNumero(enJuegoTotal / 1_000_000, 0)} MM`}
-            hint={`Entre los ${d.contactar.length} socios a contactar primero`}
+            hint={`Entre los ${d.contactar.length} contratos a contactar primero`}
           />
         </div>
 
@@ -185,7 +185,7 @@ function Page() {
               clave={(c) => c.cohorte}
               columnas={[
                 { titulo: "Cohorte", valor: (c) => c.cohorte },
-                { titulo: "Socios", valor: (c) => fmtNumero(c.socios, 0), numero: true },
+                { titulo: "Contratos", valor: (c) => fmtNumero(c.contratos, 0), numero: true },
                 {
                   titulo: "Activos a 12 m",
                   valor: (c) => (c.vivos12 === null ? "—" : `${fmtNumero(c.vivos12)}%`),

@@ -242,12 +242,20 @@ ${ILUSTRATIVO}`;
         const m = r["analizar_mora"];
         const g = r["riesgo_de_desercion"];
         const total = m.tramos.reduce((t: number, x: any) => t + x.saldoMM, 0);
-        const socios = m.tramos.reduce((t: number, x: any) => t + x.socios, 0);
+        const enMora = m.tramos.reduce((t: number, x: any) => t + x.contratos, 0);
+        const personas = m.tramos.reduce((t: number, x: any) => t + x.socios, 0);
         const ultimo = m.evolucion[m.evolucion.length - 1];
         const tramoPeor = [...m.tramos].sort((a: any, b: any) => b.saldoMM - a.saldoMM)[0];
-        return `Hay **${fmt(socios, 0)} socios en mora** con un saldo de **${gs(total)}**${c.asesor ? ` en ${c.asesor}` : ""}. Al cierre del período la mora equivale al ${fmt(ultimo?.pctFacturacion)}% de lo emitido en el mes.\n\n${tabla(
-          ["Tramo", "Socios", "Cuotas", "Saldo", "Riesgo de caída"],
-          m.tramos.map((x: any) => [x.nombre, x.socios, x.cuotas, gs(x.saldoMM), x.riesgoDeCaida]),
+        return `Hay **${fmt(enMora, 0)} contratos en mora** —de ${fmt(personas, 0)} socios— con un saldo de **${gs(total)}**${c.asesor ? ` en ${c.asesor}` : ""}. Al cierre del período la mora equivale al ${fmt(ultimo?.pctFacturacion)}% de lo emitido en el mes.\n\n${tabla(
+          ["Tramo", "Contratos", "Socios", "Cuotas", "Saldo", "Riesgo de caída"],
+          m.tramos.map((x: any) => [
+            x.nombre,
+            x.contratos,
+            x.socios,
+            x.cuotas,
+            gs(x.saldoMM),
+            x.riesgoDeCaida,
+          ]),
         )}\n\n**A quién contactar primero** (por recaudación mensual en juego, no por orden de atraso):\n\n${tabla(
           ["Contrato", "Atraso", "Cuota", "Riesgo", "En juego"],
           g.contactar
@@ -284,8 +292,8 @@ ${ILUSTRATIVO}`;
         const d = r["analizar_desercion"];
         const peor = d.desglose[0];
         const mejor = d.desglose[d.desglose.length - 1];
-        return `La deserción se concentra en **${peor.nombre}** (${fmt(peor.desercionPct)}% de sus socios) y la mejor retención está en **${mejor.nombre}** (${fmt(mejor.desercionPct)}%).\n\n${tabla(
-          ["Grupo", "Socios", "Bajas", "Deserción", "Cuota perdida", "Meses hasta la baja"],
+        return `La deserción se concentra en **${peor.nombre}** (${fmt(peor.desercionPct)}% de sus contratos) y la mejor retención está en **${mejor.nombre}** (${fmt(mejor.desercionPct)}%).\n\n${tabla(
+          ["Grupo", "Contratos", "Bajas", "Deserción", "Cuota perdida", "Meses hasta la baja"],
           d.desglose.map((x: any) => [
             x.nombre,
             fmt(x.socios, 0),
@@ -295,7 +303,7 @@ ${ILUSTRATIVO}`;
             x.mesesHastaLaBaja,
           ]),
         )}\n\n**Retención por cohorte de alta:**\n\n${tabla(
-          ["Cohorte", "Socios", "A 12 meses", "A 24 meses", "A 36 meses"],
+          ["Cohorte", "Contratos", "A 12 meses", "A 24 meses", "A 36 meses"],
           d.cohortes.map((x: any) => [
             x.cohorte,
             fmt(x.socios, 0),
@@ -335,7 +343,7 @@ ${ILUSTRATIVO}`;
         ],
         componer: (r) => {
           const a = r["consultar_adjudicaciones"];
-          let out = `En ${c.etiquetaPeriodo} se adjudicaron **${a.adjudicados} unidades**: ${a.porSorteo} por sorteo y ${a.porLicitacion} por licitación. La espera media de los adjudicados fue de **${fmt(a.esperaMediaMeses)} meses** (entre ${a.esperaMinimaMeses} y ${a.esperaMaximaMeses}).\n\nHoy hay **${fmt(a.elegiblesEnEspera, 0)} socios elegibles** en la cola. Al ritmo de ${fmt(a.adjudicadosPorMes)} adjudicaciones por mes tardaría unos ${fmt(a.aniosParaVaciarLaCola)} años en vaciarse, pero es una división, no un plazo: la cola crece con las altas y el ritmo depende de las obras.\n\n**Cómo se adjudica:** por sorteo, todos los socios al día tienen la misma chance, sin importar antigüedad ni pagos. Por licitación, gana la mejor oferta, que combina pagos realizados y puntos de beneficios.\n\n${tabla(
+          let out = `En ${c.etiquetaPeriodo} se adjudicaron **${a.adjudicados} unidades**: ${a.porSorteo} por sorteo y ${a.porLicitacion} por licitación. La espera media de los adjudicados fue de **${fmt(a.esperaMediaMeses)} meses** (entre ${a.esperaMinimaMeses} y ${a.esperaMaximaMeses}).\n\nHoy hay **${fmt(a.elegiblesEnEspera, 0)} contratos elegibles** en la cola. Al ritmo de ${fmt(a.adjudicadosPorMes)} adjudicaciones por mes tardaría unos ${fmt(a.aniosParaVaciarLaCola)} años en vaciarse, pero es una división, no un plazo: la cola crece con las altas y el ritmo depende de las obras.\n\n**Cómo se adjudica:** por sorteo, todos los socios al día tienen la misma chance, sin importar antigüedad ni pagos. Por licitación, gana la mejor oferta, que combina pagos realizados y puntos de beneficios.\n\n${tabla(
             ["Percentil de oferta", "Monto"],
             a.percentilesDeOferta.map((x: any) => [x.percentil, gs(x.ofertaMM)]),
           )}\n\n**Cómo leer el gráfico:** las barras mensuales separan sorteo de licitación, y los meses no son parejos a propósito: los actos se concentran cuando hay unidades para entregar, así que el dibujo sigue al cronograma de obra más que a la demanda. Un mes flojo no significa que la cola se haya frenado.\n\nLa tabla de percentiles es la que sirve para aconsejar a un socio. Dice qué se está ofertando hoy, no qué hace falta para ganar: la oferta ganadora depende de quién se presente en ese acto. Por eso una oferta en el percentil alto mejora mucho las chances y no las garantiza, y por eso la espera se informa como rango observado y nunca como fecha.\n\n`;
@@ -579,12 +587,22 @@ Ojo con una confusión frecuente: esto es el **simulador de planes**, con sistem
         )[0];
         const peorDes = d.desglose[0];
         return `En ${c.etiquetaPeriodo} los asesores recaudaron **${gs(v.cobradoMM)}** en total.\n\n${tabla(
-          ["Asesor", "Recaudado", "Part.", "Interanual", "Socios", "Mora / mes", "Deserción"],
+          [
+            "Asesor",
+            "Recaudado",
+            "Part.",
+            "Interanual",
+            "Contratos",
+            "Socios",
+            "Mora / mes",
+            "Deserción",
+          ],
           v.desglose.map((x: any) => [
             x.nombre,
             gs(x.cobradoMM),
             `${fmt(x.participacionPct)}%`,
             signo(x.variacionInteranualPct),
+            fmt(x.contratos, 0),
             fmt(x.socios, 0),
             `${fmt(x.moraPctFacturacionMensual)}%`,
             `${fmt((porNombre.get(x.nombre) as any)?.desercionPct)}%`,
@@ -614,12 +632,13 @@ Ojo con una confusión frecuente: esto es el **simulador de planes**, con sistem
           (a: any, b: any) => b.moraPctFacturacionMensual - a.moraPctFacturacionMensual,
         )[0];
         return `En ${c.etiquetaPeriodo} la cartera recaudó **${gs(v.cobradoMM)}** repartidos así entre los planes:\n\n${tabla(
-          ["Plan", "Recaudado", "Part.", "Interanual", "Socios", "Mora / mes"],
+          ["Plan", "Recaudado", "Part.", "Interanual", "Contratos", "Socios", "Mora / mes"],
           v.desglose.map((x: any) => [
             x.nombre,
             gs(x.cobradoMM),
             `${fmt(x.participacionPct)}%`,
             signo(x.variacionInteranualPct),
+            fmt(x.contratos, 0),
             fmt(x.socios, 0),
             `${fmt(x.moraPctFacturacionMensual)}%`,
           ]),
@@ -644,11 +663,12 @@ Ojo con una confusión frecuente: esto es el **simulador de planes**, con sistem
         const d = v.desglose.slice(0, 10);
         const top3 = d.slice(0, 3).reduce((t: number, x: any) => t + x.participacionPct, 0);
         return `Los socios se concentran en **${d[0].nombre}** (${fmt(d[0].participacionPct)}% de la recaudación), seguido de ${d[1].nombre} y ${d[2].nombre}.\n\n${tabla(
-          ["Barrio", "Recaudado", "Part.", "Socios", "Interanual"],
+          ["Barrio", "Recaudado", "Part.", "Contratos", "Socios", "Interanual"],
           d.map((x: any) => [
             x.nombre,
             gs(x.cobradoMM),
             `${fmt(x.participacionPct)}%`,
+            fmt(x.contratos, 0),
             fmt(x.socios, 0),
             signo(x.variacionInteranualPct),
           ]),

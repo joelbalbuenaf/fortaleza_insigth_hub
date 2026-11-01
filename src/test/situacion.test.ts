@@ -19,11 +19,13 @@ import {
 import {
   efectoEntregas,
   PERIODO_ACTUAL,
+  porAsesor,
+  porPlan,
   porSituacion,
   rankingSocios,
   resumenCartera,
 } from "@/server/socios/consultas";
-import { desercionPor, moraPorSituacion } from "@/server/socios/mora";
+import { desercionPor, moraPorSituacion, moraPorTramo, resumenRiesgo } from "@/server/socios/mora";
 
 const H = ULTIMO_PERIODO;
 const activos = contratos.filter((c) => esActivo(c, H));
@@ -121,7 +123,7 @@ describe("situación del contrato y estado de pago", () => {
   it("la deserción por situación usa la situación al terminar el contrato", () => {
     const filas = desercionPor("situacion");
     expect(filas.map((f) => f.clave).sort()).toEqual([...situaciones].sort());
-    expect(filas.reduce((t, f) => t + f.socios, 0)).toBe(contratos.length);
+    expect(filas.reduce((t, f) => t + f.contratos, 0)).toBe(contratos.length);
     expect(filas.reduce((t, f) => t + f.bajas, 0)).toBe(contratos.filter((c) => c.baja).length);
   });
 
@@ -165,5 +167,45 @@ describe("final del plan", () => {
     }
     // Y nadie en el padrón activo tiene el plan terminado y pago: ahí está el punto del corte.
     expect(activos.filter((c) => planFinalizado(c, H) && atrasoAl(c, H) === 0)).toHaveLength(0);
+  });
+});
+
+describe("contratos y socios no se confunden", () => {
+  // La unidad del modelo es el contrato; "socios" son personas distintas. Mezclarlos da números
+  // que parecen razonables y no lo son, así que cada campo dice cuál de los dos cuenta.
+  it("todo desglose trae los dos conteos, y los socios nunca superan a los contratos", () => {
+    const cortes = [
+      porSituacion(PERIODO_ACTUAL),
+      porAsesor(PERIODO_ACTUAL),
+      porPlan(PERIODO_ACTUAL),
+    ];
+    for (const filas of cortes)
+      for (const f of filas) {
+        expect(f.contratos, f.nombre).toBeGreaterThan(0);
+        expect(f.socios, f.nombre).toBeGreaterThan(0);
+        expect(f.socios, f.nombre).toBeLessThanOrEqual(f.contratos);
+      }
+    // Los contratos de un corte suman el padrón activo; los socios no, porque una persona con
+    // contratos en dos planes aparece en los dos grupos.
+    const porPlanFilas = porPlan(PERIODO_ACTUAL);
+    const activosTotal = resumenCartera(PERIODO_ACTUAL).activos;
+    expect(porPlanFilas.reduce((t, f) => t + f.contratos, 0)).toBe(activosTotal);
+    expect(porPlanFilas.reduce((t, f) => t + f.socios, 0)).toBeGreaterThanOrEqual(
+      resumenCartera(PERIODO_ACTUAL).socios,
+    );
+  });
+
+  it("mora, riesgo y deserción cuentan contratos, y dicen aparte cuántas personas son", () => {
+    for (const t of moraPorTramo(PERIODO_ACTUAL)) {
+      expect(t.socios, t.nombre).toBeLessThanOrEqual(t.contratos);
+      // Las cuotas impagas nunca pueden ser menos que los contratos en mora de ese tramo.
+      expect(t.cuotas, t.nombre).toBeGreaterThanOrEqual(t.contratos);
+    }
+    for (const n of resumenRiesgo(PERIODO_ACTUAL))
+      expect(n.socios, n.nivel).toBeLessThanOrEqual(n.contratos);
+    for (const d of desercionPor("canal")) {
+      expect(d.socios, d.nombre).toBeLessThanOrEqual(d.contratos);
+      expect(d.bajas, d.nombre).toBeLessThanOrEqual(d.contratos);
+    }
   });
 });

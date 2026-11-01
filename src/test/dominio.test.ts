@@ -143,7 +143,7 @@ describe("mora y deserción", () => {
   it("el scoring de riesgo está acotado y expone sus factores", () => {
     const resumen = resumenRiesgo();
     expect(resumen.map((r) => r.nivel)).toEqual(["Alto", "Medio", "Bajo"]);
-    expect(resumen.reduce((t, r) => t + r.sociosPct, 0)).toBeCloseTo(100, 0);
+    expect(resumen.reduce((t, r) => t + r.contratosPct, 0)).toBeCloseTo(100, 0);
 
     const contactar = prioridadDeContacto(undefined, 10);
     expect(contactar).toHaveLength(10);

@@ -241,33 +241,43 @@ type FilaDesglose = {
   moraPctFacturacionMensual: number;
 };
 
+/**
+ * Desglose de la cartera por una dimensión del contrato.
+ *
+ * Agrupa en un solo recorrido en lugar de volver a filtrar la cartera entera una vez por clave:
+ * con 45 asesores eso eran 45 pasadas sobre miles de contratos y se notaba.
+ */
 function desglosar(
   f: FiltroCartera,
   claves: string[],
   nombre: (c: string) => string,
-  filtroDe: (c: string) => Partial<Pick<FiltroCartera, "plan" | "asesor" | "barrio" | "situacion">>,
+  claveDe: (c: Contrato) => string,
 ): FilaDesglose[] {
-  const total = sumarCobrado(filtrar(f), f);
+  const lista = filtrar(f);
+  const total = sumarCobrado(lista, f);
   const ia = rangoInteranual(f);
-  return claves
-    .map((clave) => {
-      const lista = filtrar({ ...f, ...filtroDe(clave) });
-      const activos = lista.filter((c) => esActivo(c, f.hasta));
-      const cob = sumarCobrado(lista, f);
-      const emi = sumarEmitido(lista, f);
-      const mora = saldoEnMora(lista, f.hasta);
+  const meses = rango(f.desde, f.hasta).length;
+
+  const grupos = new Map<string, Contrato[]>(claves.map((c) => [c, []]));
+  for (const c of lista) grupos.get(claveDe(c))?.push(c);
+
+  return [...grupos.entries()]
+    .map(([clave, miembros]) => {
+      const activos = miembros.filter((c) => esActivo(c, f.hasta));
+      const cob = sumarCobrado(miembros, f);
+      const emi = sumarEmitido(miembros, f);
+      const mora = saldoEnMora(miembros, f.hasta);
       return {
         clave,
         nombre: nombre(clave),
         cobradoMM: mm(cob),
         participacionPct: total ? redondear((cob / total) * 100, 1) : 0,
-        variacionInteranualPct: ia ? pct(cob, sumarCobrado(lista, ia)) : null,
+        variacionInteranualPct: ia ? pct(cob, sumarCobrado(miembros, ia)) : null,
         contratos: activos.length,
+        /** Personas distintas: un socio con tres contratos es un solo cliente. */
         socios: new Set(activos.map((c) => c.socioId)).size,
         conPosesion: activos.filter((c) => situacionDe(c, f.hasta) === "Con posesión").length,
-        moraPctFacturacionMensual: emi
-          ? redondear((mora.saldo / (emi / rango(f.desde, f.hasta).length)) * 100, 1)
-          : 0,
+        moraPctFacturacionMensual: emi ? redondear((mora.saldo / (emi / meses)) * 100, 1) : 0,
       };
     })
     .filter((d) => d.contratos > 0)
@@ -279,7 +289,7 @@ export const porPlan = (f: FiltroCartera) =>
     f,
     [...planes],
     (c) => nombrePlan[c as Plan],
-    (c) => ({ plan: c as Plan }),
+    (c) => c.plan,
   );
 
 export const porAsesor = (f: FiltroCartera) =>
@@ -287,7 +297,7 @@ export const porAsesor = (f: FiltroCartera) =>
     f,
     [...asesores],
     (c) => c,
-    (c) => ({ asesor: c }),
+    (c) => c.asesor,
   );
 
 /** Composición de la cartera por situación: de dónde sale cada guaraní de la recaudación. */
@@ -296,7 +306,7 @@ export const porSituacion = (f: FiltroCartera) =>
     f,
     [...situaciones],
     (c) => c,
-    (c) => ({ situacion: c as Situacion }),
+    (c) => situacionDe(c, f.hasta),
   );
 
 export const porBarrio = (f: FiltroCartera) =>
@@ -304,7 +314,7 @@ export const porBarrio = (f: FiltroCartera) =>
     f,
     barrios.map((b) => b.nombre),
     (c) => c,
-    (c) => ({ barrio: c }),
+    (c) => c.barrio,
   );
 
 // ── Contratos ──────────────────────────────────────────────────────────────────────────

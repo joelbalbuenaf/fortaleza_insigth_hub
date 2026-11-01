@@ -186,11 +186,15 @@ export function ChartView({
     const barras = spec.tipo === "barras";
     // El eje Y se ensancha con la magnitud: una cuota en guaraníes son nueve caracteres
     // ("2.200.000") y con el ancho fijo de antes quedaba cortada por la izquierda.
-    const maximoY = Math.max(
-      0,
-      ...spec.datos.flatMap((d) => spec.series.map((se) => Math.abs(Number(d[se.clave]) || 0))),
+    const valoresY = spec.datos.flatMap((d) =>
+      spec.series.map((se) => Number(d[se.clave])).filter((v) => Number.isFinite(v)),
     );
+    const maximoY = Math.max(0, ...valoresY.map(Math.abs));
     const anchoY = maximoY >= 1_000_000 ? 76 : maximoY >= 100_000 ? 62 : 52;
+    // Los decimales del eje dependen del RECORRIDO de la serie, no de la magnitud de cada tick:
+    // una mora que va de 17,1% a 18,3% con cero decimales dibuja cuatro veces "18".
+    const recorridoY = valoresY.length ? Math.max(...valoresY) - Math.min(...valoresY) : 0;
+    const decimalesY = recorridoY < 1 ? 2 : recorridoY < 8 ? 1 : 0;
     const eje = disposicionEjeX(
       spec.datos.map((d) => String(d[spec.x] ?? "")),
       ancho,
@@ -215,8 +219,7 @@ export function ChartView({
         <YAxis
           width={anchoY}
           {...ejes}
-          // Con valores chicos (un operador retira < 1 ML/mes) hacen falta decimales en el eje.
-          tickFormatter={(v) => fmtNumero(v, Math.abs(v) < 10 ? 2 : 0)}
+          tickFormatter={(v) => fmtNumero(v, Math.abs(v) < 10 && recorridoY < 8 ? 2 : decimalesY)}
           // Barras siempre desde cero; líneas y áreas ajustadas al rango para ver la variación.
           domain={barras ? [0, "auto"] : ["auto", "auto"]}
         />

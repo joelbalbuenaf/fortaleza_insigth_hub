@@ -113,8 +113,8 @@ function Page() {
       <div className="space-y-6 px-6 md:px-10">
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <Kpi
-            label="Socios activos"
-            value={`${fmtNumero(r.activos, 0)} de ${fmtNumero(r.socios, 0)}`}
+            label="Contratos activos"
+            value={`${fmtNumero(r.activos, 0)} de ${fmtNumero(r.socios, 0)} socios`}
             hint={`${fmtNumero(r.alDia, 0)} al día · ${fmtNumero(r.enMora, 0)} en mora`}
           />
           <Kpi
@@ -130,7 +130,7 @@ function Page() {
           <Kpi
             label="Cuota media"
             value={`Gs ${fmtNumero(r.cuotaMediaGs, 0)}`}
-            hint="Socios activos al cierre del período"
+            hint="Contratos activos al cierre del período"
           />
         </div>
 

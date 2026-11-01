@@ -66,7 +66,7 @@ function Index() {
   const d = Route.useLoaderData();
   const r = d.resumen;
   const altas = d.alertas.filter((a) => a.severidad === "alta").length;
-  const moraSocios = d.mora.reduce((t, x) => t + x.socios, 0);
+  const moraContratos = d.mora.reduce((t, x) => t + x.contratos, 0);
   const riesgoAlto = d.riesgo.find((x) => x.nivel === "Alto");
 
   return (
@@ -111,15 +111,15 @@ function Index() {
           hint={`vs. Gs ${fmtNumero(r.interanualMM, 0)} MM en Ene–Sep 2025`}
         />
         <Kpi
-          label="Socios activos"
+          label="Contratos activos"
           value={fmtNumero(r.activos, 0)}
-          hint={`${fmtNumero(r.altas, 0)} altas y ${fmtNumero(r.bajas, 0)} bajas · neto ${r.crecimientoNeto > 0 ? "+" : ""}${fmtNumero(r.crecimientoNeto, 0)}`}
+          hint={`de ${fmtNumero(r.socios, 0)} socios · ${fmtNumero(r.altas, 0)} altas y ${fmtNumero(r.bajas, 0)} bajas`}
         />
         <Kpi
           label="Mora"
           value={`${fmtNumero(r.moraPctFacturacionMensual)}%`}
           deltaLabel="de un mes de facturación"
-          hint={`${moraSocios} socios con atraso · saldo Gs ${fmtNumero(r.moraSaldoMM, 0)} MM`}
+          hint={`${moraContratos} contratos con atraso · saldo Gs ${fmtNumero(r.moraSaldoMM, 0)} MM`}
         />
         <Kpi
           label="Obra en curso"
@@ -154,7 +154,7 @@ function Index() {
                 </dd>
               </div>
               <div className="flex items-baseline justify-between gap-3">
-                <dt className="text-muted-foreground">Socios elegibles en espera</dt>
+                <dt className="text-muted-foreground">Contratos elegibles en espera</dt>
                 <dd className="font-semibold tabular-nums">
                   {fmtNumero(d.adjudicaciones.elegiblesEnEspera, 0)}
                 </dd>

@@ -54,7 +54,9 @@ export function moraPorTramo(f: FiltroCartera = PERIODO_ACTUAL) {
     return {
       tramo: t.clave,
       nombre: t.nombre,
-      socios: lista.length,
+      contratos: lista.length,
+      /** Personas distintas detrás de esos contratos: contactarlas es una gestión por persona. */
+      socios: new Set(lista.map((s) => s.socioId)).size,
       cuotas: lista.reduce((n, s) => n + atrasoAl(s, f.hasta), 0),
       saldoMM: mm(lista.reduce((n, s) => n + atrasoAl(s, f.hasta) * cuotaVigente(s, f.hasta), 0)),
       // A más atraso, menos chance de recuperar: es el tramo que hay que atacar primero.
@@ -103,7 +105,7 @@ export function evolucionMora(f: FiltroCartera = PERIODO_ACTUAL) {
       mes: etiquetaPeriodo(periodo),
       saldoMM: mm(saldo),
       pctFacturacion: emi ? redondear((saldo / emi) * 100, 1) : 0,
-      sociosEnMora: activos.filter((s) => atrasoAl(s, periodo) > 0).length,
+      contratosEnMora: activos.filter((s) => atrasoAl(s, periodo) > 0).length,
     };
   });
 }
@@ -111,7 +113,7 @@ export function evolucionMora(f: FiltroCartera = PERIODO_ACTUAL) {
 // ── Deserción por cohorte de alta ──────────────────────────────────────────────────────
 
 /**
- * Supervivencia por cohorte: de los socios que entraron en cada año, qué proporción seguía
+ * Supervivencia por cohorte: de los contratos dados de alta en cada año, qué proporción seguía
  * activa a los 12, 24 y 36 meses. Solo se cuentan las cohortes que ya tuvieron tiempo de
  * cumplir el hito; si no, el dato queda en null en lugar de mentir con un número parcial.
  */
@@ -132,7 +134,7 @@ export function cohortesDesercion() {
     };
     return {
       cohorte: String(anio),
-      socios: cohorte.length,
+      contratos: cohorte.length,
       vivos12: hito(12),
       vivos24: hito(24),
       vivos36: hito(36),
@@ -156,18 +158,25 @@ const claveDesercion = (s: Contrato, dimension: DimensionDesercion) =>
   dimension === "situacion" ? situacionDe(s, s.baja ?? ULTIMO_PERIODO) : String(s[dimension]);
 
 export function desercionPor(dimension: DimensionDesercion) {
-  const claves =
-    dimension === "situacion"
-      ? [...situaciones]
-      : [...new Set(contratos.map((s) => claveDesercion(s, dimension)))].sort();
-  return claves
-    .map((clave) => {
-      const lista = contratos.filter((s) => claveDesercion(s, dimension) === clave);
+  // Un solo recorrido agrupando en un Map: filtrar la cartera entera una vez por clave son
+  // 45 pasadas sobre miles de contratos cuando la dimensión es el asesor.
+  const grupos = new Map<string, Contrato[]>();
+  if (dimension === "situacion") for (const x of situaciones) grupos.set(x, []);
+  for (const c of contratos) {
+    const clave = claveDesercion(c, dimension);
+    const lista = grupos.get(clave);
+    if (lista) lista.push(c);
+    else grupos.set(clave, [c]);
+  }
+
+  return [...grupos.entries()]
+    .map(([clave, lista]) => {
       const bajas = lista.filter((s) => s.baja);
       return {
-        clave: String(clave),
-        nombre: dimension === "plan" ? nombrePlan[clave as Plan] : String(clave),
-        socios: lista.length,
+        clave,
+        nombre: dimension === "plan" ? nombrePlan[clave as Plan] : clave,
+        contratos: lista.length,
+        socios: new Set(lista.map((s) => s.socioId)).size,
         bajas: bajas.length,
         desercionPct: lista.length ? redondear((bajas.length / lista.length) * 100, 1) : 0,
         /** Cuánto aportaba por mes lo que se perdió. */
@@ -332,8 +341,10 @@ export function resumenRiesgo(f: FiltroCartera = PERIODO_ACTUAL) {
     const lista = conRiesgo.filter((r) => r.nivel === nivel);
     return {
       nivel,
-      socios: lista.length,
-      sociosPct: activos.length ? redondear((lista.length / activos.length) * 100, 1) : 0,
+      contratos: lista.length,
+      contratosPct: activos.length ? redondear((lista.length / activos.length) * 100, 1) : 0,
+      /** Personas distintas: quien tiene tres contratos en riesgo es una sola llamada. */
+      socios: new Set(lista.map((r) => r.socioId)).size,
       cuotaMensualMM: mm(lista.reduce((t, r) => t + r.cuotaGs, 0)),
       atrasoPromedio: lista.length
         ? redondear(lista.reduce((t, r) => t + r.atraso, 0) / lista.length, 1)

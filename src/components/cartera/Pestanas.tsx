@@ -98,6 +98,7 @@ export function Resumen({ datos }: { datos: DatosDe<"resumen"> }) {
               { titulo: "Plan", valor: (p) => p.nombre },
               { titulo: "Recaudado", valor: (p) => gs(p.cobradoMM), numero: true },
               { titulo: "Part.", valor: (p) => `${fmtNumero(p.participacionPct)}%`, numero: true },
+              { titulo: "Contratos", valor: (p) => fmtNumero(p.contratos, 0), numero: true },
               { titulo: "Socios", valor: (p) => fmtNumero(p.socios, 0), numero: true },
               {
                 titulo: "Interanual",
@@ -196,6 +197,7 @@ export function Territorio({ datos }: { datos: DatosDe<"territorio"> }) {
                   valor: (b) => `${fmtNumero(b.participacionPct)}%`,
                   numero: true,
                 },
+                { titulo: "Contratos", valor: (b) => fmtNumero(b.contratos, 0), numero: true },
                 { titulo: "Socios", valor: (b) => fmtNumero(b.socios, 0), numero: true },
               ]}
             />
@@ -207,7 +209,7 @@ export function Territorio({ datos }: { datos: DatosDe<"territorio"> }) {
       </Seccion>
       {sel && datos.seleccion && (
         <Seccion
-          titulo={`Socios de ${sel} · ${fmtNumero(datos.seleccion.resumen.activos, 0)} activos`}
+          titulo={`Contratos de ${sel} · ${fmtNumero(datos.seleccion.resumen.activos, 0)} activos de ${fmtNumero(datos.seleccion.resumen.socios, 0)} socios`}
           acciones={<BotonCsv filas={datos.seleccion.socios} nombre={`socios-${sel}`} />}
         >
           <TablaSocios filas={datos.seleccion.socios} alto={360} />
@@ -282,7 +284,7 @@ export function Asesores({ datos }: { datos: DatosDe<"asesores"> }) {
           clave={(c) => c.clave}
           columnas={[
             { titulo: "Canal", valor: (c) => c.nombre },
-            { titulo: "Socios", valor: (c) => fmtNumero(c.socios, 0), numero: true },
+            { titulo: "Contratos", valor: (c) => fmtNumero(c.contratos, 0), numero: true },
             { titulo: "Bajas", valor: (c) => fmtNumero(c.bajas, 0), numero: true },
             { titulo: "Deserción", valor: (c) => `${fmtNumero(c.desercionPct)}%`, numero: true },
             { titulo: "Cuota perdida", valor: (c) => gs(c.cuotaPerdidaMM), numero: true },
@@ -342,7 +344,8 @@ export function Mora({ datos }: { datos: DatosDe<"mora"> }) {
           clave={(t) => t.tramo}
           columnas={[
             { titulo: "Tramo", valor: (t) => t.nombre },
-            { titulo: "Contratos", valor: (t) => fmtNumero(t.socios, 0), numero: true },
+            { titulo: "Contratos", valor: (t) => fmtNumero(t.contratos, 0), numero: true },
+            { titulo: "Socios", valor: (t) => fmtNumero(t.socios, 0), numero: true },
             { titulo: "Cuotas", valor: (t) => fmtNumero(t.cuotas, 0), numero: true },
             { titulo: "Saldo", valor: (t) => gs(t.saldoMM), numero: true },
             {
@@ -432,7 +435,7 @@ export function Desercion({ datos }: { datos: DatosDe<"desercion"> }) {
           clave={(c) => c.cohorte}
           columnas={[
             { titulo: "Cohorte", valor: (c) => c.cohorte },
-            { titulo: "Socios", valor: (c) => fmtNumero(c.socios, 0), numero: true },
+            { titulo: "Contratos", valor: (c) => fmtNumero(c.contratos, 0), numero: true },
             {
               titulo: "Activos a 12 m",
               valor: (c) => (c.vivos12 === null ? "—" : `${fmtNumero(c.vivos12)}%`),
@@ -467,6 +470,7 @@ export function Desercion({ datos }: { datos: DatosDe<"desercion"> }) {
             clave={(c) => c.clave}
             columnas={[
               { titulo: "Canal", valor: (c) => c.nombre },
+              { titulo: "Contratos", valor: (c) => fmtNumero(c.contratos, 0), numero: true },
               { titulo: "Deserción", valor: (c) => `${fmtNumero(c.desercionPct)}%`, numero: true },
               { titulo: "Bajas", valor: (c) => fmtNumero(c.bajas, 0), numero: true },
               { titulo: "Meses hasta la baja", valor: (c) => c.mesesHastaLaBaja, numero: true },
@@ -479,6 +483,7 @@ export function Desercion({ datos }: { datos: DatosDe<"desercion"> }) {
             clave={(p) => p.clave}
             columnas={[
               { titulo: "Plan", valor: (p) => p.nombre },
+              { titulo: "Contratos", valor: (p) => fmtNumero(p.contratos, 0), numero: true },
               { titulo: "Deserción", valor: (p) => `${fmtNumero(p.desercionPct)}%`, numero: true },
               { titulo: "Bajas", valor: (p) => fmtNumero(p.bajas, 0), numero: true },
               { titulo: "Cuota perdida", valor: (p) => gs(p.cuotaPerdidaMM), numero: true },
@@ -495,7 +500,7 @@ export function Desercion({ datos }: { datos: DatosDe<"desercion"> }) {
           clave={(x) => x.clave}
           columnas={[
             { titulo: "Situación", valor: (x) => <SituacionContrato situacion={x.nombre} /> },
-            { titulo: "Contratos", valor: (x) => fmtNumero(x.socios, 0), numero: true },
+            { titulo: "Contratos", valor: (x) => fmtNumero(x.contratos, 0), numero: true },
             { titulo: "Bajas", valor: (x) => fmtNumero(x.bajas, 0), numero: true },
             { titulo: "Deserción", valor: (x) => `${fmtNumero(x.desercionPct)}%`, numero: true },
             { titulo: "Cuota perdida", valor: (x) => gs(x.cuotaPerdidaMM), numero: true },

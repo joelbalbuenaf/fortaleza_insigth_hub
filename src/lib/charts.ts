@@ -69,17 +69,17 @@ export const descripcionGraficos: Record<GraficoId, string> = {
     "Barras de la recaudación por situación del contrato (en espera, adjudicado, con posesión). Un contrato con posesión aporta cerca de 3× uno en espera, así que muestra de dónde sale realmente la plata.",
   cartera_por_barrio:
     "Barras de aportes recaudados por barrio de domicilio del socio. Filtros: desde, hasta, limite.",
-  altas_bajas: "Barras mensuales de altas y bajas de socios: crecimiento neto de la cartera.",
+  altas_bajas: "Barras mensuales de altas y bajas de contratos: crecimiento neto de la cartera.",
   ticket_por_plan: "Barras del aporte mensual promedio por plan (Gs).",
-  antiguedad_socios: "Barras de socios activos por tramo de antigüedad en años.",
+  antiguedad_socios: "Barras de contratos activos por tramo de antigüedad en años.",
   concentracion_cartera:
-    "Curva de concentración: % de la recaudación acumulada según % de socios ordenados por aporte.",
+    "Curva de concentración: % de la recaudación acumulada según % de contratos ordenados por aporte.",
   forecast_cartera:
     "Recaudación histórica + proyección de los próximos 8 meses con intervalo del 80%. Filtros: plan, ajuste_pct.",
   mora_tramos: "Barras de saldo en mora por tramo de atraso (1–3, 4–6, 7–12, 13+ meses).",
   mora_evolucion: "Línea mensual de la mora como % de lo emitido.",
   desercion_cohortes:
-    "Supervivencia por cohorte de alta: % de socios que siguen activos a los 12, 24 y 36 meses.",
+    "Supervivencia por cohorte de alta: % de contratos que siguen activos a los 12, 24 y 36 meses.",
   adjudicaciones_mensuales:
     "Barras apiladas de unidades adjudicadas por mes, separando sorteo y licitación.",
   espera_adjudicacion:

@@ -86,7 +86,7 @@ function Page() {
             hint={`Entre ${r.esperaMinimaMeses} y ${r.esperaMaximaMeses} meses`}
           />
           <Kpi
-            label="Elegibles en espera"
+            label="Contratos elegibles"
             value={fmtNumero(r.elegiblesEnEspera, 0)}
             hint={`${fmtNumero(r.adjudicadosPorMes)} adjudicaciones por mes`}
           />

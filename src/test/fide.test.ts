@@ -173,7 +173,9 @@ describe("modo demo", () => {
     ["Prepará un resumen ejecutivo con tres oportunidades", "detectar_alertas"],
   ];
   for (const [pregunta, herramienta] of casos)
-    it(`responde: ${pregunta}`, async () => {
+    // Cada caso corre las herramientas de verdad sobre toda la cartera: el default de 5 s queda
+    // justo y la suite se pone intermitente.
+    it(`responde: ${pregunta}`, { timeout: 30_000 }, async () => {
       const f = escritorFalso();
       await responderEnDemo(pregunta, f.w);
       expect(f.herramientasUsadas).toContain(herramienta);
