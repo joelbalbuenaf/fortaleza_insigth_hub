@@ -85,7 +85,7 @@ function Problema({ index }: { index: number }) {
     {
       n: "Cobranza",
       t: "¿Quién se está cayendo del plan?",
-      d: "La mora se mira por planilla y por sucursal. Saber cuánta recaudación está en riesgo se arma a mano.",
+      d: "La mora se mira por planilla y por asesor. Saber cuánta recaudación está en riesgo se arma a mano.",
     },
     {
       n: "Adjudicaciones",

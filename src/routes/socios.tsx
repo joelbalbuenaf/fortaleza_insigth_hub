@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { MessageSquareText, Search, X } from "lucide-react";
 import { Kpi, PageHeader } from "@/components/AppShell";
-import { EstadoSocio, TablaSocios } from "@/components/cartera/Pestanas";
+import { EstadoSocio, SituacionContrato, TablaSocios } from "@/components/cartera/Pestanas";
 import { BotonCsv, Seccion, Tabla } from "@/components/comercial/comun";
 import { FilterBar } from "@/components/filters/FilterBar";
 import { Input } from "@/components/ui/input";
@@ -19,7 +19,9 @@ import { fmtNumero } from "@/lib/export";
 import { validarFiltrosUrl, type FiltrosUrl } from "@/lib/filtros-url";
 import { obtenerSocios, type EntradaSocios } from "@/lib/hub/api";
 
-const estados = ["Al día", "En mora", "Adjudicado", "Desertado"] as const;
+/** Cómo viene pagando. La situación del contrato (en espera / adjudicado / con posesión) es el
+ *  otro eje y va en la barra de filtros, porque son independientes. */
+const estados = ["Al día", "En mora", "Baja"] as const;
 const ordenes = [
   { id: "aportes", label: "Más aportes" },
   { id: "oferta", label: "Mejor oferta licitatoria" },
@@ -104,7 +106,7 @@ function Page() {
       <PageHeader
         eyebrow="Cartera"
         title="Socios"
-        desc="Un contrato por socio. Buscá por número de contrato, plan, sucursal o barrio, filtrá y abrí la ficha."
+        desc="La unidad es el contrato, y un socio puede tener varios. Buscá por número de contrato, plan, asesor o barrio, filtrá y abrí la ficha."
         periodo={periodo}
         fuente="ilustrativo"
       />
@@ -116,9 +118,9 @@ function Page() {
             hint={`${fmtNumero(r.alDia, 0)} al día · ${fmtNumero(r.enMora, 0)} en mora`}
           />
           <Kpi
-            label="Adjudicados vigentes"
-            value={fmtNumero(r.adjudicadosVigentes, 0)}
-            hint={`${fmtNumero(r.adjudicadosEnPeriodo, 0)} adjudicados en el período`}
+            label="Con posesión"
+            value={fmtNumero(r.conPosesion, 0)}
+            hint={`${fmtNumero(r.adjudicados, 0)} adjudicados esperando la entrega · ${fmtNumero(r.enEspera, 0)} en espera`}
           />
           <Kpi
             label="Aportado en el período"
@@ -138,14 +140,15 @@ function Page() {
               <div className="min-w-0">
                 <p className="font-mono text-xs text-muted-foreground">{ficha.contrato}</p>
                 <h2 className="text-lg font-semibold">
-                  {ficha.plan} · {ficha.sucursal}
+                  {ficha.plan} · asesor {ficha.asesor}
                 </h2>
                 <p className="text-sm text-muted-foreground">
                   {ficha.barrio} · alta en {ficha.altaEtiqueta} · canal {ficha.canal}
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <EstadoSocio estado={ficha.estado} />
+                <SituacionContrato situacion={ficha.situacion} />
+                <EstadoSocio estado={ficha.estadoPago} />
                 <Link
                   to="/chat"
                   search={{ q: `¿Cómo viene el contrato ${ficha.contrato}?` }}
@@ -208,7 +211,7 @@ function Page() {
               <Input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="Contrato, plan, sucursal o barrio"
+                placeholder="Contrato, plan, asesor o barrio"
                 className="pl-8"
                 aria-label="Buscar socio"
               />
@@ -222,7 +225,7 @@ function Page() {
               }
             />
             <Selector
-              etiqueta="Estado"
+              etiqueta="Pago"
               valor={search.estado ?? ""}
               opciones={[{ id: "", label: "Todos" }, ...estados.map((e) => ({ id: e, label: e }))]}
               onCambio={(v) => ir({ estado: (v || undefined) as EntradaSocios["estado"] })}
@@ -233,7 +236,10 @@ function Page() {
               opciones={[{ id: "", label: "Todos" }, ...canales.map((c) => ({ id: c, label: c }))]}
               onCambio={(v) => ir({ canal: v || undefined })}
             />
-            <FilterBar filtros={search as FiltrosUrl} mostrar={["periodo", "plan", "sucursal"]} />
+            <FilterBar
+              filtros={search as FiltrosUrl}
+              mostrar={["periodo", "plan", "asesor", "situacion"]}
+            />
             {filtrosActivos && (
               <button
                 type="button"

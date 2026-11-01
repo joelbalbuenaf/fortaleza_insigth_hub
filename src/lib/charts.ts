@@ -31,7 +31,8 @@ export const graficosDisponibles = [
   // ── Cartera ────────────────────────────────────────────────────────────────────────
   "cartera_mensual",
   "cartera_por_plan",
-  "cartera_por_sucursal",
+  "cartera_por_asesor",
+  "composicion_cartera",
   "cartera_por_barrio",
   "altas_bajas",
   "ticket_por_plan",
@@ -60,9 +61,12 @@ export type GraficoId = (typeof graficosDisponibles)[number];
 
 export const descripcionGraficos: Record<GraficoId, string> = {
   cartera_mensual:
-    "Línea mensual de aportes recaudados (Gs MM) con el año anterior. Filtros: desde, hasta, plan, sucursal, barrio.",
+    "Línea mensual de aportes recaudados (Gs MM) con el año anterior. Filtros: desde, hasta, plan, asesor, barrio.",
   cartera_por_plan: "Barras de aportes recaudados por plan (Amplia, Plan 20, adicionales).",
-  cartera_por_sucursal: "Barras de aportes recaudados por sucursal. Filtros: desde, hasta, limite.",
+  cartera_por_asesor:
+    "Barras de aportes recaudados por asesor comercial. Filtros: desde, hasta, limite.",
+  composicion_cartera:
+    "Barras de la recaudación por situación del contrato (en espera, adjudicado, con posesión). Un contrato con posesión aporta cerca de 3× uno en espera, así que muestra de dónde sale realmente la plata.",
   cartera_por_barrio:
     "Barras de aportes recaudados por barrio de domicilio del socio. Filtros: desde, hasta, limite.",
   altas_bajas: "Barras mensuales de altas y bajas de socios: crecimiento neto de la cartera.",
@@ -96,7 +100,8 @@ export const descripcionGraficos: Record<GraficoId, string> = {
 export type ParametrosGrafico = {
   grafico: GraficoId;
   plan?: "Amplia" | "Plan 20" | "Adicional" | undefined;
-  sucursal?: string | undefined;
+  asesor?: string | undefined;
+  situacion?: "En espera" | "Adjudicado" | "Con posesión" | undefined;
   barrio?: string | undefined;
   proyecto?: string | undefined;
   desde?: string | undefined;

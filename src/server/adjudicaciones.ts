@@ -1,7 +1,7 @@
 // Adjudicaciones: sorteo y licitación (solo servidor). Datos ILUSTRATIVOS sobre un mecanismo
 // PÚBLICO, el que Fortaleza describe en su sitio:
 //   - Sorteo: se extrae una bolilla de cada contenedor para formar el número de contrato, así que
-//     todos los socios al día tienen la misma probabilidad, sin importar su antigüedad.
+//     todos los contratos al día tienen la misma probabilidad, sin importar su antigüedad.
 //   - Licitación: se abren los sobres ante escribano y gana la mejor oferta, que combina los
 //     pagos realizados con los puntos de beneficios.
 //
@@ -14,9 +14,9 @@ import {
   antiguedadMeses,
   esElegible,
   ofertaLicitatoria,
-  socios,
+  contratos,
   VALOR_PUNTO,
-  type Socio,
+  type Contrato,
   type ViaAdjudicacion,
 } from "./socios/datos";
 import { PERIODO_ACTUAL, type FiltroCartera } from "./socios/consultas";
@@ -28,7 +28,7 @@ export const MECANISMOS: ViaAdjudicacion[] = ["Sorteo", "Licitación"];
 /** Actos de adjudicación mes a mes. */
 export function serieAdjudicaciones(f: FiltroCartera = PERIODO_ACTUAL) {
   return rango(f.desde, f.hasta).map((periodo) => {
-    const delMes = socios.filter((s) => s.adjudicado === periodo);
+    const delMes = contratos.filter((s) => s.adjudicado === periodo);
     const sorteo = delMes.filter((s) => s.via === "Sorteo");
     const licitacion = delMes.filter((s) => s.via === "Licitación");
     const ofertas = licitacion.map((s) => ofertaLicitatoria(s, periodo));
@@ -39,7 +39,7 @@ export function serieAdjudicaciones(f: FiltroCartera = PERIODO_ACTUAL) {
       sorteo: sorteo.length,
       licitacion: licitacion.length,
       total: delMes.length,
-      elegibles: socios.filter((s) => esElegible(s, periodo) || s.adjudicado === periodo).length,
+      elegibles: contratos.filter((s) => esElegible(s, periodo) || s.adjudicado === periodo).length,
       /** Oferta más baja que ganó en la licitación del mes: el "corte" del acto. */
       ofertaGanadoraMinimaMM: ofertas.length ? mm(Math.min(...ofertas), 1) : null,
       ofertaGanadoraMediaMM: ofertas.length ? mm(media(ofertas), 1) : null,
@@ -49,11 +49,11 @@ export function serieAdjudicaciones(f: FiltroCartera = PERIODO_ACTUAL) {
 
 /** Resumen del período: cuántas unidades se adjudicaron y cuánto esperaron los adjudicados. */
 export function resumenAdjudicaciones(f: FiltroCartera = PERIODO_ACTUAL) {
-  const delPeriodo = socios.filter(
+  const delPeriodo = contratos.filter(
     (s) => s.adjudicado && s.adjudicado >= f.desde && s.adjudicado <= f.hasta,
   );
   const esperas = delPeriodo.map((s) => antiguedadMeses(s, s.adjudicado!));
-  const elegiblesHoy = socios.filter((s) => esElegible(s, f.hasta));
+  const elegiblesHoy = contratos.filter((s) => esElegible(s, f.hasta));
   const porMes = serieAdjudicaciones(f);
   const adjudicadosPorMes = media(porMes.map((m) => m.total));
 
@@ -80,14 +80,14 @@ export function resumenAdjudicaciones(f: FiltroCartera = PERIODO_ACTUAL) {
 /** Espera hasta la adjudicación según el año de alta, para ver si la cola se alarga o se acorta. */
 export function esperaPorCohorte() {
   const anios = [
-    ...new Set(socios.filter((s) => s.adjudicado).map((s) => Number(s.alta.slice(0, 4)))),
+    ...new Set(contratos.filter((s) => s.adjudicado).map((s) => Number(s.alta.slice(0, 4)))),
   ]
     .sort()
     .slice(-12);
   return anios.map((anio) => {
-    const lista = socios.filter((s) => s.adjudicado && Number(s.alta.slice(0, 4)) === anio);
+    const lista = contratos.filter((s) => s.adjudicado && Number(s.alta.slice(0, 4)) === anio);
     const esperas = lista.map((s) => antiguedadMeses(s, s.adjudicado!));
-    const total = socios.filter((s) => Number(s.alta.slice(0, 4)) === anio).length;
+    const total = contratos.filter((s) => Number(s.alta.slice(0, 4)) === anio).length;
     return {
       cohorte: String(anio),
       adjudicados: lista.length,
@@ -125,9 +125,9 @@ export type EntradaSimulacion = {
  * Es un cálculo sobre el acto siguiente, no un plazo prometido.
  */
 export function simularAdjudicacion(entrada: EntradaSimulacion, hasta = PERIODO_ACTUAL.hasta) {
-  const elegibles = socios.filter((s) => esElegible(s, hasta));
+  const elegibles = contratos.filter((s) => esElegible(s, hasta));
   const existente = entrada.contrato
-    ? socios.find((s) => s.contrato.toLowerCase() === entrada.contrato!.toLowerCase())
+    ? contratos.find((s) => s.contrato.toLowerCase() === entrada.contrato!.toLowerCase())
     : undefined;
 
   const antiguedad = existente
@@ -185,13 +185,13 @@ export function simularAdjudicacion(entrada: EntradaSimulacion, hasta = PERIODO_
     /** Oferta que hoy haría falta para entrar por licitación. */
     ofertaParaEntrarMM: corte === null ? null : mm(corte, 1),
     cupos: { sorteo: cuposSorteo, licitacion: cuposLicitacion },
-    nota: "El sorteo no mira antigüedad ni pagos: todos los socios al día tienen la misma chance. La licitación sí ordena por oferta. Esto describe el próximo acto, no un plazo de adjudicación.",
+    nota: "El sorteo no mira antigüedad ni pagos: todos los contratos al día tienen la misma chance. La licitación sí ordena por oferta. Esto describe el próximo acto, no un plazo de adjudicación.",
   };
 }
 
 /** Distribución de ofertas de los elegibles: dónde está el corte de la licitación. */
 export function distribucionOfertas(hasta = PERIODO_ACTUAL.hasta) {
-  const ofertas = socios
+  const ofertas = contratos
     .filter((s) => esElegible(s, hasta))
     .map((s) => ofertaLicitatoria(s, hasta))
     .sort((a, b) => a - b);
@@ -215,8 +215,10 @@ export type Adjudicado = {
 
 /** Últimos adjudicados, identificados por contrato (nunca por nombre). */
 export function ultimosAdjudicados(limite = 20): Adjudicado[] {
-  return socios
-    .filter((s): s is Socio & { adjudicado: string; via: ViaAdjudicacion } => Boolean(s.adjudicado))
+  return contratos
+    .filter((s): s is Contrato & { adjudicado: string; via: ViaAdjudicacion } =>
+      Boolean(s.adjudicado),
+    )
     .sort((a, b) => b.adjudicado.localeCompare(a.adjudicado))
     .slice(0, limite)
     .map((s) => ({

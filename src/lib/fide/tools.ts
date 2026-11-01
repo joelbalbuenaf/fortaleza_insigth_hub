@@ -3,7 +3,14 @@
 // "ilustrativo" (supuestos de la demo) o "mixto".
 import * as z from "zod/v4";
 import { graficosDisponibles, type ChartSpec } from "@/lib/charts";
-import { canales, planes, sucursales } from "@/lib/data/filtros";
+import {
+  APORTE_ESPERA,
+  APORTE_POSESION,
+  canales,
+  planes,
+  asesores,
+  situaciones,
+} from "@/lib/data/filtros";
 import { nombresBarrios, normalizar } from "@/lib/data/geografia";
 import { periodos } from "@/lib/data/periodos";
 import {
@@ -37,7 +44,8 @@ import {
   PERIODO_ACTUAL,
   porBarrio,
   porPlan,
-  porSucursal,
+  porAsesor,
+  porSituacion,
   rankingSocios,
   resumenCartera,
   serieMensualCartera,
@@ -47,6 +55,7 @@ import {
   cohortesDesercion,
   desercionPor,
   evolucionMora,
+  moraPorSituacion,
   moraPorTramo,
   prioridadDeContacto,
   resumenRiesgo,
@@ -62,7 +71,15 @@ const periodo = z
     `Mes AAAA-MM entre ${periodos[0]} y ${periodos[periodos.length - 1]}. Por defecto Ene–Sep 2026.`,
   );
 const plan = z.enum(planes);
-const sucursal = z.enum(sucursales);
+const asesor = z.enum(asesores);
+const situacion = z
+  .enum(situaciones)
+  .describe(
+    "Dónde está el contrato en el camino hacia su unidad. En espera: todavía no se adjudicó. " +
+      "Adjudicado: ya tiene unidad asignada pero la torre no se entregó. Con posesión: recibió la " +
+      `unidad y pasó a aportar Gs ${APORTE_POSESION.toLocaleString("es-PY")} al mes en lugar de ` +
+      `Gs ${APORTE_ESPERA.toLocaleString("es-PY")}.`,
+  );
 const barrio = z.enum(nombresBarrios as [string, ...string[]]);
 
 export type ResultadoHerramienta = { resultado: unknown; graficos?: ChartSpec[] };
@@ -88,17 +105,24 @@ export const herramientas = [
   definir({
     name: "consultar_cartera",
     description:
-      "ILUSTRATIVO. Aportes recaudados del Sistema de Ahorro (guaraníes → Gs MM): total, variación interanual y contra el período anterior, socios activos, altas y bajas, adjudicados, mora y efectividad de cobranza. Con el desglose pedido (mes, plan, sucursal o barrio).",
+      "ILUSTRATIVO. Aportes recaudados del Sistema de Ahorro (guaraníes → Gs MM): total, variación interanual y contra el período anterior, contratos y socios activos, altas y bajas, composición en espera / adjudicados / con posesión, mora y efectividad de cobranza. Con el desglose pedido (mes, plan, asesor, situación o barrio). Agrupar por situación es la forma de ver de dónde sale la recaudación: los contratos con posesión aportan cerca de 3× los que esperan.",
     inputSchema: z.object({
       desde: periodo.optional(),
       hasta: periodo.optional(),
       plan: plan.optional(),
-      sucursal: sucursal.optional(),
+      asesor: asesor.optional(),
+      situacion: situacion.optional(),
       barrio: barrio.optional(),
-      agrupar: z.enum(["total", "mes", "plan", "sucursal", "barrio"]),
+      agrupar: z.enum(["total", "mes", "plan", "asesor", "situacion", "barrio"]),
     }),
     run: (i) => {
-      const f = { ...rangoDe(i), plan: i.plan, sucursal: i.sucursal, barrio: i.barrio };
+      const f = {
+        ...rangoDe(i),
+        plan: i.plan,
+        asesor: i.asesor,
+        situacion: i.situacion,
+        barrio: i.barrio,
+      };
       const desglose =
         i.agrupar === "mes"
           ? serieMensualCartera(f).map(({ etiqueta, cobradoMM, emitidoMM, anioAnteriorMM }) => ({
@@ -109,11 +133,13 @@ export const herramientas = [
             }))
           : i.agrupar === "plan"
             ? porPlan(f)
-            : i.agrupar === "sucursal"
-              ? porSucursal(f)
-              : i.agrupar === "barrio"
-                ? porBarrio(f).slice(0, 15)
-                : undefined;
+            : i.agrupar === "asesor"
+              ? porAsesor(f)
+              : i.agrupar === "situacion"
+                ? porSituacion(f)
+                : i.agrupar === "barrio"
+                  ? porBarrio(f).slice(0, 15)
+                  : undefined;
       return { resultado: { filtros: f, ...resumenCartera(f), desglose } };
     },
   }),
@@ -174,8 +200,15 @@ export const herramientas = [
       desde: periodo.optional(),
       hasta: periodo.optional(),
       plan: plan.optional(),
-      sucursal: sucursal.optional(),
-      estado: z.enum(["Al día", "En mora", "Adjudicado", "Desertado"]).optional(),
+      asesor: asesor.optional(),
+      situacion: situacion.optional(),
+      estado_pago: z
+        .enum(["Al día", "En mora", "Baja"])
+        .optional()
+        .describe(
+          "Cómo viene pagando. Es independiente de la situación: un contrato con posesión puede " +
+            "estar en mora.",
+        ),
       canal: z.enum(canales).optional(),
       orden: z.enum(["aportes", "antiguedad", "atraso", "oferta"]),
       limite: z.number().int().min(1).max(30).optional(),
@@ -184,8 +217,9 @@ export const herramientas = [
       const f = {
         ...rangoDe(i),
         plan: i.plan,
-        sucursal: i.sucursal,
-        estado: i.estado,
+        asesor: i.asesor,
+        situacion: i.situacion,
+        estadoPago: i.estado_pago,
         canal: i.canal,
       };
       const filas = rankingSocios(f, i.orden);
@@ -229,21 +263,23 @@ export const herramientas = [
   definir({
     name: "analizar_mora",
     description:
-      "ILUSTRATIVO. Mora por tramo de atraso (1–2, 3–4, 5–6 cuotas) con saldo y riesgo de caída, y evolución mensual de la mora sobre lo emitido. A las 7 cuotas impagas el contrato se cae.",
+      "ILUSTRATIVO. Mora por tramo de atraso (1–2, 3–4, 5–6 cuotas) con saldo y riesgo de caída, evolución mensual de la mora sobre lo emitido, y mora comparada por situación del contrato (quien espera su unidad frente a quien ya la recibió y paga la cuota alta). A las 7 cuotas impagas el contrato se cae.",
     inputSchema: z.object({
       desde: periodo.optional(),
       hasta: periodo.optional(),
-      sucursal: sucursal.optional(),
+      asesor: asesor.optional(),
       plan: plan.optional(),
+      situacion: situacion.optional(),
     }),
     run: (i) => {
-      const f = { ...rangoDe(i), sucursal: i.sucursal, plan: i.plan };
+      const f = { ...rangoDe(i), asesor: i.asesor, plan: i.plan, situacion: i.situacion };
       return {
         resultado: {
           fuente: "ilustrativo",
           filtros: f,
           tramos: moraPorTramo(f),
           evolucion: evolucionMora(f),
+          porSituacion: moraPorSituacion(f),
         },
       };
     },
@@ -251,9 +287,9 @@ export const herramientas = [
   definir({
     name: "analizar_desercion",
     description:
-      "ILUSTRATIVO. Deserción de la cartera: retención por cohorte de alta (a 12, 24 y 36 meses) y deserción agrupada por plan, canal de alta o sucursal, con la cuota mensual que se perdió y la antigüedad típica al momento de la baja.",
+      "ILUSTRATIVO. Deserción de la cartera: retención por cohorte de alta (a 12, 24 y 36 meses) y deserción agrupada por plan, canal de alta, asesor o situación, con la cuota mensual que se perdió y la antigüedad típica al momento de la baja. Agrupada por situación, la clave es la del contrato cuando terminó: responde si se abandona esperando la unidad o ya viviendo en ella.",
     inputSchema: z.object({
-      agrupar: z.enum(["plan", "canal", "sucursal"]).optional(),
+      agrupar: z.enum(["plan", "canal", "asesor", "situacion"]).optional(),
     }),
     run: (i) => ({
       resultado: {
@@ -269,11 +305,12 @@ export const herramientas = [
     description:
       "ILUSTRATIVO. Scoring 0–100 de riesgo de abandono con factores explícitos (atraso, antigüedad, cumplimiento histórico, canal, plan, si ya está adjudicado). Devuelve el resumen por nivel de riesgo y los socios a contactar primero, ordenados por recaudación en juego.",
     inputSchema: z.object({
-      sucursal: sucursal.optional(),
+      asesor: asesor.optional(),
+      situacion: situacion.optional(),
       limite: z.number().int().min(1).max(25).optional(),
     }),
     run: (i) => {
-      const f = { ...PERIODO_ACTUAL, sucursal: i.sucursal };
+      const f = { ...PERIODO_ACTUAL, asesor: i.asesor, situacion: i.situacion };
       return {
         resultado: {
           fuente: "ilustrativo",
@@ -476,7 +513,7 @@ export const herramientas = [
     inputSchema: z.object({
       grafico: z.enum(graficosDisponibles),
       plan: plan.optional(),
-      sucursal: sucursal.optional(),
+      asesor: asesor.optional(),
       barrio: barrio.optional(),
       desde: periodo.optional(),
       hasta: periodo.optional(),

@@ -16,7 +16,7 @@ import {
 } from "@/lib/data/periodos";
 import { proyectos, proyectosEnObra, type Proyecto } from "@/lib/data/proyectos";
 import { crearAzar, entre, redondear } from "@/lib/data/random";
-import { cobrado, socios } from "./socios/datos";
+import { cobrado, contratos } from "./socios/datos";
 import { serieMensualCartera } from "./socios/consultas";
 
 const mm = (guaranies: number, d = 0) => redondear(guaranies / 1_000_000, d);
@@ -114,7 +114,7 @@ function asignacionPorProyecto(hasta: string) {
   let reserva = 0;
 
   for (const periodo of rango(periodos[0]!, hasta)) {
-    let disponible = socios.reduce((t, s) => t + cobrado(s, periodo), 0) * PROPORCION_A_OBRA;
+    let disponible = contratos.reduce((t, s) => t + cobrado(s, periodo), 0) * PROPORCION_A_OBRA;
     if (disponible <= 0) continue;
 
     // Cupo del mes de cada obra activa: lo que su cronograma consume, más el adelanto permitido.

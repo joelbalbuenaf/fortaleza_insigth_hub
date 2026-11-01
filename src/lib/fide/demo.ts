@@ -5,7 +5,15 @@
 // sin costo ni conexión, y lo dice explícitamente. Corre solo en el servidor.
 import type { ParametrosGrafico } from "@/lib/charts";
 import { oportunidades } from "@/lib/analytical-questions";
-import { nombrePlan, planes, sucursales, type Plan, type Sucursal } from "@/lib/data/filtros";
+import {
+  nombrePlan,
+  planes,
+  asesores,
+  situaciones,
+  type Plan,
+  type Asesor,
+  type Situacion,
+} from "@/lib/data/filtros";
 import { nombresBarrios, normalizar } from "@/lib/data/geografia";
 import { presetsPeriodo, PRIMER_PERIODO, ULTIMO_PERIODO } from "@/lib/data/periodos";
 import { ejecutarHerramienta } from "./tools";
@@ -35,7 +43,8 @@ type Contexto = {
   hasta: string;
   etiquetaPeriodo: string;
   plan: Plan | undefined;
-  sucursal: Sucursal | undefined;
+  asesor: Asesor | undefined;
+  situacion: Situacion | undefined;
   barrio: string | undefined;
   contrato: string | null;
   ajuste: number | null;
@@ -62,7 +71,8 @@ function leerContexto(pregunta: string): Contexto {
     plan: planes.find(
       (p) => texto.includes(normalizar(p)) || texto.includes(normalizar(nombrePlan[p])),
     ),
-    sucursal: sucursales.find((s) => texto.includes(normalizar(s))),
+    asesor: asesores.find((s) => texto.includes(normalizar(s))),
+    situacion: situaciones.find((x) => texto.includes(normalizar(x))),
     barrio: nombresBarrios.find((b) => texto.includes(normalizar(b))),
     contrato: pregunta.match(/\bF-?\s?1\d{5}\b/i)?.[0]?.replace(/\s/g, "") ?? null,
     ajuste: ajuste
@@ -89,7 +99,8 @@ const cartera = (c: Contexto, agrupar: string, extra: Record<string, unknown> = 
     desde: c.desde,
     hasta: c.hasta,
     plan: c.plan,
-    sucursal: c.sucursal,
+    asesor: c.asesor,
+    situacion: c.situacion,
     barrio: c.barrio,
     agrupar,
     ...extra,
@@ -123,7 +134,7 @@ const intenciones: Intencion[] = [
         "Prepará un resumen ejecutivo con tres oportunidades, evidencia y próximos pasos.",
       ],
       componer: () =>
-        "Hoy el Hub trabaja con una **cartera ilustrativa**: socios, aportes, mora, deserción, adjudicaciones, obra y mercado son supuestos generados para la demo. Lo único público es el catálogo de proyectos (nombres, años y estado, del sitio de Fortaleza).\n\nCon la **cartera real** se podrían hacer cosas que hoy no:\n\n- **Cobranza dirigida**: priorizar contactos por recaudación en juego de verdad, no sobre un scoring de ejemplo.\n- **Retención por cohorte real**: medir si una campaña de alta sirvió, mirando la deserción a los 12 meses de esa cohorte.\n- **Calce de obra**: cruzar los aportes efectivamente asignados contra los certificados de obra, en lugar de un reparto proporcional al costo.\n- **Adjudicaciones**: estimar la espera con las actas reales de sorteo y licitación, y las ofertas ganadoras históricas.\n- **Rentabilidad por plan y por sucursal**, que hoy no se puede calcular porque no hay costos cargados.\n\nQué haría falta: el padrón de contratos con sus aportes mes a mes, las actas de adjudicación, los certificados de avance de obra y los costos por proyecto. Las mismas pantallas y herramientas funcionarían sin cambios.",
+        "Hoy el Hub trabaja con una **cartera ilustrativa**: socios, aportes, mora, deserción, adjudicaciones, obra y mercado son supuestos generados para la demo. Lo único público es el catálogo de proyectos (nombres, años y estado, del sitio de Fortaleza).\n\nCon la **cartera real** se podrían hacer cosas que hoy no:\n\n- **Cobranza dirigida**: priorizar contactos por recaudación en juego de verdad, no sobre un scoring de ejemplo.\n- **Retención por cohorte real**: medir si una campaña de alta sirvió, mirando la deserción a los 12 meses de esa cohorte.\n- **Calce de obra**: cruzar los aportes efectivamente asignados contra los certificados de obra, en lugar de un reparto proporcional al costo.\n- **Adjudicaciones**: estimar la espera con las actas reales de sorteo y licitación, y las ofertas ganadoras históricas.\n- **Rentabilidad por plan y por asesor**, que hoy no se puede calcular porque no hay costos cargados.\n\nQué haría falta: el padrón de contratos con sus aportes mes a mes, las actas de adjudicación, los certificados de avance de obra y los costos por proyecto. Las mismas pantallas y herramientas funcionarían sin cambios.",
     }),
   },
   {
@@ -138,7 +149,7 @@ const intenciones: Intencion[] = [
       componer: (r) => {
         const s = r["buscar_socio"];
         if (!s.encontrado) return s.mensaje;
-        return `El contrato **${s.contrato}** (${nombrePlan[s.plan as Plan]}, sucursal ${s.sucursal}) lleva **${s.antiguedadMeses} meses** de antigüedad y aportó ${gs(s.aportadoMM)} en ${c.etiquetaPeriodo}.\n\n${tabla(
+        return `El contrato **${s.contrato}** (${nombrePlan[s.plan as Plan]}, asesor ${s.asesor}) lleva **${s.antiguedadMeses} meses** de antigüedad y aportó ${gs(s.aportadoMM)} en ${c.etiquetaPeriodo}.\n\n${tabla(
           ["Dato", "Valor"],
           [
             ["Estado", s.estado],
@@ -156,15 +167,62 @@ const intenciones: Intencion[] = [
     }),
   },
   {
+    // Antes que la mora: "¿se atrasa más el que ya tiene posesión?" lleva "atrasa", pero la
+    // pregunta es de composición.
+    test: re(/posesion|poseedor|aportante|composicion|en espera|ya tiene su unidad/),
+    plan: (c) => ({
+      pasos: [
+        cartera({ ...c, situacion: undefined }, "situacion"),
+        {
+          herramienta: "analizar_mora",
+          input: { desde: c.desde, hasta: c.hasta, asesor: c.asesor },
+        },
+        grafico({ grafico: "composicion_cartera", desde: c.desde, hasta: c.hasta }),
+      ],
+      sugerencias: [
+        "¿Se atrasa más el que espera su unidad o el que ya la recibió?",
+        "¿Qué entregas vienen y cuántos contratos pasan a la cuota con posesión?",
+        "¿Cómo vienen los actos de adjudicación mes a mes?",
+      ],
+      componer: (r) => {
+        const v = r["consultar_cartera"];
+        const m = r["analizar_mora"];
+        const porSit = new Map((m.porSituacion ?? []).map((x: any) => [x.situacion, x]));
+        const pos = v.desglose.find((x: any) => x.clave === "Con posesión");
+        return `De los **${fmt(v.activos, 0)} contratos activos**, ${fmt(pos?.contratos ?? 0, 0)} ya tienen posesión de su unidad y explican el **${fmt(pos?.participacionPct)}%** de lo recaudado en ${c.etiquetaPeriodo}: su aporte mensual es cerca de tres veces el de quien todavía espera.
+
+${tabla(
+  ["Situación", "Contratos", "Cuota / mes", "Recaudado", "Part.", "En mora", "% en mora"],
+  v.desglose.map((x: any) => {
+    const s = porSit.get(x.clave) as any;
+    return [
+      x.nombre,
+      fmt(x.contratos, 0),
+      `Gs ${fmt(s?.cuotaMensualGs ?? 0, 0)}`,
+      gs(x.cobradoMM),
+      `${fmt(x.participacionPct)}%`,
+      fmt(s?.enMora ?? 0, 0),
+      `${fmt(s?.moraPct)}%`,
+    ];
+  }),
+)}
+
+La situación y el estado de pago son ejes independientes: un contrato con posesión también puede estar en mora, y cuando lo está el saldo pesa más porque su cuota es la alta.
+
+${ILUSTRATIVO}`;
+      },
+    }),
+  },
+  {
     test: re(/mora|atraso|impag|moroso|cobranza/),
     plan: (c) => ({
       pasos: [
         {
           herramienta: "analizar_mora",
-          input: { desde: c.desde, hasta: c.hasta, sucursal: c.sucursal },
+          input: { desde: c.desde, hasta: c.hasta, asesor: c.asesor },
         },
-        { herramienta: "riesgo_de_desercion", input: { sucursal: c.sucursal, limite: 8 } },
-        grafico({ grafico: "mora_tramos", sucursal: c.sucursal }),
+        { herramienta: "riesgo_de_desercion", input: { asesor: c.asesor, limite: 8 } },
+        grafico({ grafico: "mora_tramos", asesor: c.asesor }),
       ],
       sugerencias: [
         "¿Qué factores explican el riesgo de deserción y dónde se concentra?",
@@ -177,7 +235,7 @@ const intenciones: Intencion[] = [
         const total = m.tramos.reduce((t: number, x: any) => t + x.saldoMM, 0);
         const socios = m.tramos.reduce((t: number, x: any) => t + x.socios, 0);
         const ultimo = m.evolucion[m.evolucion.length - 1];
-        return `Hay **${fmt(socios, 0)} socios en mora** con un saldo de **${gs(total)}**${c.sucursal ? ` en ${c.sucursal}` : ""}. Al cierre del período la mora equivale al ${fmt(ultimo?.pctFacturacion)}% de lo emitido en el mes.\n\n${tabla(
+        return `Hay **${fmt(socios, 0)} socios en mora** con un saldo de **${gs(total)}**${c.asesor ? ` en ${c.asesor}` : ""}. Al cierre del período la mora equivale al ${fmt(ultimo?.pctFacturacion)}% de lo emitido en el mes.\n\n${tabla(
           ["Tramo", "Socios", "Cuotas", "Saldo", "Riesgo de caída"],
           m.tramos.map((x: any) => [x.nombre, x.socios, x.cuotas, gs(x.saldoMM), x.riesgoDeCaida]),
         )}\n\n**A quién contactar primero** (por recaudación mensual en juego, no por orden de atraso):\n\n${tabla(
@@ -202,11 +260,7 @@ const intenciones: Intencion[] = [
         {
           herramienta: "analizar_desercion",
           input: {
-            agrupar: /sucursal/.test(c.texto)
-              ? "sucursal"
-              : /plan/.test(c.texto)
-                ? "plan"
-                : "canal",
+            agrupar: /asesor/.test(c.texto) ? "asesor" : /plan/.test(c.texto) ? "plan" : "canal",
           },
         },
         grafico({ grafico: "desercion_cohortes" }),
@@ -482,12 +536,12 @@ const intenciones: Intencion[] = [
     }),
   },
   {
-    test: re(/sucursal|asesor|canal|alta|vendedor/),
+    test: re(/asesor|canal|alta|vendedor/),
     plan: (c) => ({
       pasos: [
-        cartera(c, "sucursal"),
-        { herramienta: "analizar_desercion", input: { agrupar: "sucursal" } },
-        grafico({ grafico: "cartera_por_sucursal", desde: c.desde, hasta: c.hasta }),
+        cartera(c, "asesor"),
+        { herramienta: "analizar_desercion", input: { agrupar: "asesor" } },
+        grafico({ grafico: "cartera_por_asesor", desde: c.desde, hasta: c.hasta }),
       ],
       sugerencias: [
         "Compará la deserción por canal de alta y decime qué cambiarías en la venta.",
@@ -498,8 +552,8 @@ const intenciones: Intencion[] = [
         const v = r["consultar_cartera"];
         const d = r["analizar_desercion"];
         const porNombre = new Map(d.desglose.map((x: any) => [x.nombre, x]));
-        return `En ${c.etiquetaPeriodo} las sucursales recaudaron **${gs(v.cobradoMM)}** en total.\n\n${tabla(
-          ["Sucursal", "Recaudado", "Part.", "Interanual", "Socios", "Mora / mes", "Deserción"],
+        return `En ${c.etiquetaPeriodo} los asesores recaudaron **${gs(v.cobradoMM)}** en total.\n\n${tabla(
+          ["Asesor", "Recaudado", "Part.", "Interanual", "Socios", "Mora / mes", "Deserción"],
           v.desglose.map((x: any) => [
             x.nombre,
             gs(x.cobradoMM),
@@ -552,7 +606,7 @@ const intenciones: Intencion[] = [
       sugerencias: [
         "¿Cómo están los precios de m² por barrio?",
         "¿Dónde conviene buscar el próximo terreno?",
-        "Compará las sucursales por recaudación, altas y mora.",
+        "Compará los asesores por recaudación, altas y mora.",
       ],
       componer: (r) => {
         const v = r["consultar_cartera"];
@@ -660,7 +714,7 @@ const intenciones: Intencion[] = [
         }),
       ],
       sugerencias: [
-        "Compará las sucursales por recaudación, altas y mora.",
+        "Compará los asesores por recaudación, altas y mora.",
         "¿Cómo está repartida la mora por tramo de atraso?",
         "Proyectá la recaudación y explicá las limitaciones del modelo.",
       ],
@@ -703,7 +757,7 @@ export async function responderEnDemo(pregunta: string, w: EscritorFide, signal?
         componer: (r) => {
           const v = r["consultar_cartera"];
           const a = r["detectar_alertas"].alertas.slice(0, 3);
-          return `En modo demo entiendo preguntas sobre la cartera (recaudación, planes, sucursales, barrios, crecimiento), la mora y la deserción, las adjudicaciones, la obra, el mercado y el simulador de planes.\n\nMientras tanto, un panorama: en ${c.etiquetaPeriodo} la cartera recaudó **${gs(v.cobradoMM)}** (${signo(v.variacionInteranualPct)} interanual) con ${fmt(v.activos, 0)} socios activos. Alertas principales:\n\n${a.map((x: any) => `- **${x.titulo}**: ${x.detalle}`).join("\n")}\n\n${ILUSTRATIVO}`;
+          return `En modo demo entiendo preguntas sobre la cartera (recaudación, planes, asesores, barrios, crecimiento), la mora y la deserción, las adjudicaciones, la obra, el mercado y el simulador de planes.\n\nMientras tanto, un panorama: en ${c.etiquetaPeriodo} la cartera recaudó **${gs(v.cobradoMM)}** (${signo(v.variacionInteranualPct)} interanual) con ${fmt(v.activos, 0)} socios activos. Alertas principales:\n\n${a.map((x: any) => `- **${x.titulo}**: ${x.detalle}`).join("\n")}\n\n${ILUSTRATIVO}`;
         },
       };
 

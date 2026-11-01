@@ -3,7 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { MessageSquareText } from "lucide-react";
 import { Kpi } from "@/components/AppShell";
 import { ChartView } from "@/components/charts/ChartView";
-import { EstadoSocio } from "@/components/cartera/Pestanas";
+import { EstadoSocio, SituacionContrato } from "@/components/cartera/Pestanas";
 import { BotonCsv, Seccion, Tabla } from "@/components/comercial/comun";
 import { FilterBar } from "@/components/filters/FilterBar";
 import { Contenido, EncabezadoSolucion } from "@/components/soluciones/comun";
@@ -40,7 +40,7 @@ function Page() {
         fuente="ilustrativo"
       />
       <Contenido>
-        <FilterBar filtros={search} mostrar={["periodo", "plan", "sucursal"]} />
+        <FilterBar filtros={search} mostrar={["periodo", "plan", "asesor", "situacion"]} />
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {d.riesgo.map((n) => (
@@ -89,7 +89,11 @@ function Page() {
                     titulo: "Contrato",
                     valor: (x) => <span className="font-mono text-xs">{x.contrato}</span>,
                   },
-                  { titulo: "Sucursal", valor: (x) => x.sucursal },
+                  { titulo: "Asesor", valor: (x) => x.asesor },
+                  {
+                    titulo: "Situación",
+                    valor: (x) => <SituacionContrato situacion={x.situacion} />,
+                  },
                   { titulo: "Atraso", valor: (x) => x.atraso, numero: true },
                   { titulo: "Cuota", valor: (x) => `Gs ${fmtNumero(x.cuotaGs, 0)}`, numero: true },
                   {
@@ -104,6 +108,12 @@ function Page() {
                   {
                     titulo: "En juego",
                     valor: (x) => `Gs ${fmtNumero(x.enJuegoGs, 0)}`,
+                    numero: true,
+                  },
+                  {
+                    // Un socio con varios contratos se contacta una vez, no una por contrato.
+                    titulo: "Contratos del socio",
+                    valor: (x) => x.contratosDelSocio,
                     numero: true,
                   },
                 ]}

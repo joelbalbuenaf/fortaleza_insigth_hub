@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { graficosDisponibles } from "@/lib/charts";
+import { APORTE_ESPERA, APORTE_POSESION, asesores, situaciones } from "@/lib/data/filtros";
 import { separarSugerencias } from "@/components/fide/FideMessage";
 import { responderEnDemo } from "@/lib/fide/demo";
 import { etiquetaDe, etiquetasHerramientas } from "@/lib/fide/etiquetas";
@@ -87,6 +88,58 @@ describe("herramientas de Fide", () => {
     // El catálogo de gráficos viaja en el prompt, así que Fide no puede inventar uno.
     for (const g of graficosDisponibles) expect(SYSTEM_PROMPT).toContain(g);
   });
+
+  it("el prompt nombra las tres situaciones y los dos aportes", () => {
+    for (const s of situaciones) expect(SYSTEM_PROMPT).toContain(s);
+    // Los valores van desde la constante, así que no pueden quedar desfasados del modelo.
+    expect(SYSTEM_PROMPT).toContain(APORTE_ESPERA.toLocaleString("es-PY"));
+    expect(SYSTEM_PROMPT).toContain(APORTE_POSESION.toLocaleString("es-PY"));
+    // Y aclara que los dos ejes son independientes, que es el error fácil de cometer.
+    expect(SYSTEM_PROMPT).toContain("puede estar en mora");
+    // El asesor y el canal de alta son dos cosas distintas: el prompt lo dice.
+    expect(SYSTEM_PROMPT).toContain("CANAL DE ALTA");
+    expect(SYSTEM_PROMPT).toContain(asesores[0]!);
+  });
+
+  it("las herramientas cortan por asesor y por situación, y agrupan por situación", () => {
+    const porSituacion = ejecutarHerramienta("consultar_cartera", { agrupar: "situacion" })
+      .resultado as { desglose: { clave: string; contratos: number }[] };
+    expect(porSituacion.desglose.map((d) => d.clave).sort()).toEqual([...situaciones].sort());
+
+    const unAsesor = ejecutarHerramienta("consultar_cartera", {
+      agrupar: "total",
+      asesor: asesores[3],
+    }).resultado as { contratos: number };
+    const todos = ejecutarHerramienta("consultar_cartera", { agrupar: "total" }).resultado as {
+      contratos: number;
+    };
+    expect(unAsesor.contratos).toBeGreaterThan(0);
+    expect(unAsesor.contratos).toBeLessThan(todos.contratos);
+
+    // El cruce que el modelo viejo no podía responder.
+    const mora = ejecutarHerramienta("analizar_mora", {}).resultado as {
+      porSituacion: { situacion: string; enMora: number; cuotaMensualGs: number }[];
+    };
+    const pos = mora.porSituacion.find((x) => x.situacion === "Con posesión")!;
+    expect(pos.enMora).toBeGreaterThan(0);
+    expect(pos.cuotaMensualGs).toBe(APORTE_POSESION);
+
+    const desercion = ejecutarHerramienta("analizar_desercion", { agrupar: "situacion" })
+      .resultado as { desglose: { clave: string }[] };
+    expect(desercion.desglose.map((d) => d.clave).sort()).toEqual([...situaciones].sort());
+
+    // Filtrar por situación y por estado de pago a la vez devuelve solo ese cruce.
+    const ranking = ejecutarHerramienta("ranking_socios", {
+      orden: "atraso",
+      situacion: "Con posesión",
+      estado_pago: "En mora",
+      limite: 5,
+    }).resultado as { socios: { situacion: string; estadoPago: string }[] };
+    expect(ranking.socios.length).toBeGreaterThan(0);
+    expect(
+      ranking.socios.every((s) => s.situacion === "Con posesión" && s.estadoPago === "En mora"),
+    ).toBe(true);
+  });
 });
 
 describe("modo demo", () => {
@@ -102,7 +155,11 @@ describe("modo demo", () => {
     ["¿Cómo viene el catálogo de proyectos?", "consultar_proyectos"],
     ["Simulá un plan de 180 cuotas con 60 cuotas antes de la adjudicación", "simular_plan"],
     ["Proyectá la recaudación y explicá las limitaciones", "proyectar_cartera"],
-    ["Compará las sucursales por recaudación", "consultar_cartera"],
+    ["Compará los asesores por recaudación", "consultar_cartera"],
+    [
+      "¿De qué se compone la recaudación entre los que esperan y los que tienen posesión?",
+      "consultar_cartera",
+    ],
     ["¿Cómo viene el crecimiento neto de la cartera?", "analizar_crecimiento"],
     ["¿Qué alertas atenderías primero?", "detectar_alertas"],
     ["Prepará un resumen ejecutivo con tres oportunidades", "detectar_alertas"],

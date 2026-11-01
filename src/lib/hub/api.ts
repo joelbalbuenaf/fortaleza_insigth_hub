@@ -33,29 +33,31 @@ import {
 import {
   altasYBajas,
   concentracion,
+  efectoEntregas,
   fichaSocio,
   mesesAtipicos,
   PERIODO_ACTUAL,
   porBarrio,
   porPlan,
-  porSucursal,
+  porAsesor,
+  porSituacion,
   rankingSocios,
   resumenCartera,
   serieMensualCartera,
   tramosAntiguedad,
-  type EstadoSocioFiltro,
   type OrdenSocios,
 } from "@/server/socios/consultas";
 import {
   cohortesDesercion,
   desercionPor,
   evolucionMora,
+  moraPorSituacion,
   moraPorTramo,
   prioridadDeContacto,
   resumenRiesgo,
 } from "@/server/socios/mora";
 import { evaluarTerreno, rankingBarrios } from "@/server/terrenos";
-import { FUENTE_CARTERA } from "@/server/socios/datos";
+import { FUENTE_CARTERA, type EstadoPago } from "@/server/socios/datos";
 import { FUENTE_PUBLICA } from "@/lib/data/proyectos";
 
 // ── Inicio ───────────────────────────────────────────────────────────────────────────
@@ -88,7 +90,7 @@ export const obtenerInicio = createServerFn({ method: "GET" }).handler(async () 
 // ── Cartera ──────────────────────────────────────────────────────────────────────────
 
 export type TabCartera =
-  "resumen" | "territorio" | "sucursales" | "mora" | "desercion" | "forecast" | "estadistica";
+  "resumen" | "territorio" | "asesores" | "mora" | "desercion" | "forecast" | "estadistica";
 
 type EntradaCartera = FiltrosUrl & { tab?: TabCartera; aj?: number };
 
@@ -108,10 +110,12 @@ export const obtenerCartera = createServerFn({ method: "GET" })
           graficos: {
             mensual: construirGrafico({ ...f, grafico: "cartera_mensual", desde: PRIMER_PERIODO }),
             planes: construirGrafico({ ...f, grafico: "cartera_por_plan" }),
-            sucursales: construirGrafico({ ...f, grafico: "cartera_por_sucursal" }),
+            asesores: construirGrafico({ ...f, grafico: "cartera_por_asesor" }),
+            composicion: construirGrafico({ ...f, grafico: "composicion_cartera" }),
             altasBajas: construirGrafico({ ...f, grafico: "altas_bajas" }),
           },
           planes: porPlan(f),
+          composicion: porSituacion(f),
         };
       case "territorio": {
         const barrios = porBarrio({ ...f, barrio: undefined });
@@ -134,15 +138,16 @@ export const obtenerCartera = createServerFn({ method: "GET" })
             : null,
         };
       }
-      case "sucursales":
+      case "asesores":
         return {
           ...base,
-          tab: "sucursales" as const,
-          sucursales: porSucursal(f),
-          desercion: desercionPor("sucursal"),
+          tab: "asesores" as const,
+          asesores: porAsesor(f),
+          desercion: desercionPor("asesor"),
           canales: desercionPor("canal"),
+          composicion: porSituacion(f),
           graficos: {
-            sucursales: construirGrafico({ ...f, grafico: "cartera_por_sucursal" }),
+            asesores: construirGrafico({ ...f, grafico: "cartera_por_asesor" }),
             ticket: construirGrafico({ ...f, grafico: "ticket_por_plan" }),
           },
         };
@@ -153,6 +158,7 @@ export const obtenerCartera = createServerFn({ method: "GET" })
           resumen: resumenCartera(f),
           tramos: moraPorTramo(f),
           evolucion: evolucionMora(f),
+          porSituacion: moraPorSituacion(f),
           graficos: {
             tramos: construirGrafico({ ...f, grafico: "mora_tramos" }),
             evolucion: construirGrafico({ ...f, grafico: "mora_evolucion" }),
@@ -165,6 +171,7 @@ export const obtenerCartera = createServerFn({ method: "GET" })
           cohortes: cohortesDesercion(),
           porCanal: desercionPor("canal"),
           porPlan: desercionPor("plan"),
+          porSituacion: desercionPor("situacion"),
           graficos: {
             cohortes: construirGrafico({ grafico: "desercion_cohortes" }),
             altasBajas: construirGrafico({ ...f, grafico: "altas_bajas" }),
@@ -178,6 +185,8 @@ export const obtenerCartera = createServerFn({ method: "GET" })
           tab: "forecast" as const,
           ajuste,
           proyeccion,
+          // Aparte de la proyección a propósito: es calendario de obra, no estadística.
+          entregas: efectoEntregas(),
           grafico: construirGrafico({
             grafico: "forecast_cartera",
             plan: f.plan,
@@ -207,7 +216,7 @@ export const obtenerCartera = createServerFn({ method: "GET" })
 
 export type EntradaSocios = FiltrosUrl & {
   q?: string;
-  estado?: EstadoSocioFiltro;
+  estado?: EstadoPago;
   canal?: string;
   orden?: OrdenSocios;
   c?: string;
@@ -222,7 +231,7 @@ export const obtenerSocios = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const f = aFiltrosCartera(data);
     const todas = rankingSocios(
-      { ...f, busqueda: data.q, estado: data.estado, canal: data.canal },
+      { ...f, busqueda: data.q, estadoPago: data.estado, canal: data.canal },
       data.orden ?? "aportes",
     );
     return {

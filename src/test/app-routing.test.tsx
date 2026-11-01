@@ -41,11 +41,29 @@ describe("rutas de la app", () => {
 
   it("valida los filtros de la URL y descarta valores inventados", () => {
     expect(
-      validarFiltrosUrl({ p: "u12", plan: "Amplia", suc: "Villa Morra", barrio: "Recoleta" }),
-    ).toEqual({ p: "u12", plan: "Amplia", suc: "Villa Morra", barrio: "Recoleta" });
-    expect(validarFiltrosUrl({ p: "1999", plan: "Oro", suc: "Marte", barrio: "Narnia" })).toEqual(
-      {},
-    );
+      validarFiltrosUrl({
+        p: "u12",
+        plan: "Amplia",
+        ase: "A-07",
+        sit: "Con posesión",
+        barrio: "Recoleta",
+      }),
+    ).toEqual({
+      p: "u12",
+      plan: "Amplia",
+      ase: "A-07",
+      sit: "Con posesión",
+      barrio: "Recoleta",
+    });
+    expect(
+      validarFiltrosUrl({
+        p: "1999",
+        plan: "Oro",
+        ase: "A-99",
+        sit: "Mudado",
+        barrio: "Narnia",
+      }),
+    ).toEqual({});
     expect(aFiltrosCartera({ p: "a2025" })).toMatchObject({ desde: "2025-01", hasta: "2025-12" });
     expect(aFiltrosCartera({})).toMatchObject({ desde: "2026-01", hasta: "2026-09" });
   });

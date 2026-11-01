@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { correlacion, regresion } from "@/lib/data/estadistica";
 import { FILTROS_POR_DEFECTO, normalizarFiltros } from "@/lib/data/filtros";
 import { avenidas, barrios, nombresBarrios } from "@/lib/data/geografia";
-import { mesesEntre, periodos, ULTIMO_PERIODO } from "@/lib/data/periodos";
+import { mesesEntre, periodos, PRIMER_PERIODO, ULTIMO_PERIODO } from "@/lib/data/periodos";
 import {
   proyectos,
   proyectosEnObra,
@@ -31,7 +31,7 @@ import {
   prioridadDeContacto,
   resumenRiesgo,
 } from "@/server/socios/mora";
-import { socios } from "@/server/socios/datos";
+import { contratos } from "@/server/socios/datos";
 import { evaluarTerreno, puntoDeBarrio, rankingBarrios } from "@/server/terrenos";
 
 describe("catálogo público de proyectos", () => {
@@ -61,10 +61,19 @@ describe("catálogo público de proyectos", () => {
     );
   });
 
-  it("las adjudicaciones no superan las unidades del catálogo", () => {
-    const adjudicados = socios.filter((s) => s.adjudicado).length;
-    expect(adjudicados).toBeGreaterThan(0);
-    expect(adjudicados).toBeLessThan(unidadesTotales);
+  it("las adjudicaciones con proyecto no superan las unidades del catálogo", () => {
+    const adjudicados = contratos.filter((s) => s.adjudicado);
+    expect(adjudicados.length).toBeGreaterThan(0);
+    // Las del calendario consumen unidades del catálogo y no pueden pasarse.
+    const conProyecto = adjudicados.filter((s) => s.proyecto);
+    expect(conProyecto.length).toBeGreaterThan(0);
+    expect(conProyecto.length).toBeLessThanOrEqual(unidadesTotales);
+    // Las anteriores a Ene 2022 quedan sin proyecto a propósito: el sitio dice tener 17 proyectos
+    // entregados pero nombra 12, así que esas unidades no están en el catálogo público y
+    // asignárselas a los proyectos que sí están los dejaría 100% adjudicados desde el arranque.
+    expect(
+      adjudicados.filter((s) => !s.proyecto).every((s) => s.adjudicado! < PRIMER_PERIODO),
+    ).toBe(true);
   });
 });
 
@@ -87,7 +96,7 @@ describe("geografía de Asunción", () => {
         desde: "2030-01",
         plan: "Inexistente" as never,
         barrio: "Narnia",
-        sucursal: "Marte" as never,
+        asesor: "Marte" as never,
       }),
     ).toEqual(FILTROS_POR_DEFECTO);
     expect(normalizarFiltros({ desde: "2026-09", hasta: "2026-01" })).toMatchObject({

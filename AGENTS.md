@@ -30,7 +30,25 @@
   a propósito (una mayoría cumplidora y una minoría irregular): con una sola distribución la mora
   del agregado queda irrealmente cerca de cero.
 - Los socios que entraron antes de Ene 2022 traen su historia en `pagadoPrevio` y su antigüedad
-  se mide con `mesesEntre`, no con el índice del calendario.
+  se mide con `mesesEntre`, no con el índice del calendario. Sus adjudicaciones quedan **sin
+  proyecto**: el sitio dice tener 17 proyectos entregados pero nombra 12, así que esas unidades no
+  están en el catálogo y cargárselas a los que sí están los dejaría 100% adjudicados de arranque.
+- La unidad del modelo es el **contrato**, no la persona (`socioId` agrupa). Todo conteo dice cuál
+  de los dos es; nunca se mezclan en una misma cifra.
+- **Situación** (`En espera` / `Adjudicado` / `Con posesión`) y **estado de pago** (`Al día` /
+  `En mora` / `Finalizado` / `Baja`) son ejes INDEPENDIENTES y se calculan con funciones distintas
+  (`situacionDe` y `estadoDePagoDe`). Antes era un solo estado donde "Adjudicado" pisaba a
+  "En mora" y la mora de los adjudicados no se contaba en ningún indicador: no volver a mezclarlos.
+- El aporte mensual lo fija la administradora y depende **solo de la situación**
+  (`APORTE_ESPERA` / `APORTE_POSESION`, `aporteDelMes` los deflacta hacia atrás con `AJUSTE_ANUAL`).
+  No varía por socio, plan ni barrio: en un sistema de ahorro eso contradice el esfuerzo común.
+- La posesión llega con la **entrega de la torre adjudicada** (diciembre del año del catálogo), no
+  con la adjudicación. Las adjudicaciones consumen unidades del catálogo y no pueden pasarse.
+- Un contrato que completó su plan sale del padrón activo (`planFinalizado`), salvo que quede
+  debiendo: esa deuda es cobrable y tiene que seguir apareciendo en la mora.
+- El **efecto de las entregas** sobre la recaudación va SIEMPRE aparte de la proyección
+  estadística: `proyectarSerie` es tendencia + estacionalidad y no conoce el cronograma de obra.
+  Sumarlos en una sola curva inventa una precisión que ninguno de los dos cálculos tiene.
 - **Fide** (`POST /api/chat`): con `ANTHROPIC_API_KEY` usa Claude con herramientas
   (`src/lib/fide/`); sin key responde en modo demo con las mismas herramientas, sin IA. Los hilos
   se guardan en localStorage.

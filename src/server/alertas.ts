@@ -5,7 +5,7 @@ import { resumenAdjudicaciones, serieAdjudicaciones } from "./adjudicaciones";
 import { estadoDeObra } from "./obra";
 import { barriosSinPresencia, resumenMercado } from "./mercado";
 import { cohortesDesercion, desercionPor, moraPorTramo, resumenRiesgo } from "./socios/mora";
-import { mesesAtipicos, PERIODO_ACTUAL, porSucursal, resumenCartera } from "./socios/consultas";
+import { mesesAtipicos, PERIODO_ACTUAL, porAsesor, resumenCartera } from "./socios/consultas";
 
 export type Severidad = "alta" | "media" | "baja";
 export type Area = "Cartera" | "Mora" | "Adjudicaciones" | "Obra" | "Mercado";
@@ -108,23 +108,23 @@ export function detectarAlertas(): Alerta[] {
       enlace: "/cartera",
     });
 
-  const sucursales = porSucursal(PERIODO_ACTUAL);
-  const cae = sucursales.filter(
+  const asesores = porAsesor(PERIODO_ACTUAL);
+  const cae = asesores.filter(
     (s) => s.variacionInteranualPct !== null && s.variacionInteranualPct < 10,
   );
   if (cae.length)
     out.push({
-      id: "sucursales-flojas",
+      id: "asesores-flojas",
       severidad: "baja",
       area: "Cartera",
       fuente: "ilustrativo",
-      titulo: `${cae.length} sucursal${cae.length === 1 ? "" : "es"} crece${cae.length === 1 ? "" : "n"} menos que la cartera`,
+      titulo: `${cae.length} asesor${cae.length === 1 ? "" : "es"} crece${cae.length === 1 ? "" : "n"} menos que la cartera`,
       detalle: `La cartera creció ${signo(r.variacionInteranualPct ?? 0)}%; ${cae
         .slice(0, 3)
         .map((s) => `${s.nombre} (${signo(s.variacionInteranualPct ?? 0)}%)`)
         .join(", ")}.`,
-      pregunta: "Compará las sucursales por recaudación, altas y mora.",
-      enlace: "/cartera?tab=sucursales",
+      pregunta: "Compará los asesores por recaudación, altas y mora.",
+      enlace: "/cartera?tab=asesores",
     });
 
   for (const m of mesesAtipicos().slice(0, 1))

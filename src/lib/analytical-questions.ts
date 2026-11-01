@@ -2,7 +2,7 @@
 export const categoriasPreguntas = {
   Cartera: [
     "¿Cómo viene la recaudación de 2026 frente a 2025?",
-    "Compará las sucursales por recaudación, altas y mora.",
+    "Compará los asesores por recaudación, altas y mora.",
     "¿Cómo viene el crecimiento neto de la cartera?",
     "¿Cómo se reparte la cartera entre los planes?",
     "¿De qué barrios vienen los socios?",

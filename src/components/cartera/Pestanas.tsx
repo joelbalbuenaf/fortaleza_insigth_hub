@@ -17,6 +17,9 @@ const gs = (v: number | null | undefined) => `Gs ${fmtNumero(v, 0)} MM`;
 
 export function Resumen({ datos }: { datos: DatosDe<"resumen"> }) {
   const r = datos.resumen;
+  // Los que ya recibieron su unidad son pocos y pesan mucho: su aporte es cerca de 3× el de
+  // quien espera. Es la lectura que el KPI tiene que dejar ver de entrada.
+  const pctPosesion = r.activos ? (r.conPosesion / r.activos) * 100 : 0;
   return (
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -33,14 +36,14 @@ export function Resumen({ datos }: { datos: DatosDe<"resumen"> }) {
           hint={`${gs(r.cobradoMM)} cobrados de ${gs(r.emitidoMM)} emitidos`}
         />
         <Kpi
-          label="Socios activos"
+          label="Contratos activos"
           value={fmtNumero(r.activos, 0)}
-          hint={`${fmtNumero(r.altas, 0)} altas · ${fmtNumero(r.bajas, 0)} bajas · neto ${r.crecimientoNeto > 0 ? "+" : ""}${fmtNumero(r.crecimientoNeto, 0)}`}
+          hint={`de ${fmtNumero(r.socios, 0)} socios · ${fmtNumero(r.altas, 0)} altas · ${fmtNumero(r.bajas, 0)} bajas`}
         />
         <Kpi
-          label="Cuota media"
-          value={`Gs ${fmtNumero(r.cuotaMediaGs, 0)}`}
-          hint={`${fmtNumero(r.adjudicadosEnPeriodo, 0)} unidades adjudicadas en el período`}
+          label="Con posesión"
+          value={fmtNumero(r.conPosesion, 0)}
+          hint={`${fmtNumero(pctPosesion, 1)}% de los activos y ${gs(r.cobradoPosesionMM)} de lo recaudado`}
         />
       </div>
       <div className="grid gap-6 xl:grid-cols-2">
@@ -53,11 +56,37 @@ export function Resumen({ datos }: { datos: DatosDe<"resumen"> }) {
         <Seccion titulo="Por plan">
           <ChartView spec={datos.graficos.planes} />
         </Seccion>
-        <Seccion titulo="Por sucursal">
-          <ChartView spec={datos.graficos.sucursales} />
+        <Seccion titulo="Por asesor">
+          <ChartView spec={datos.graficos.asesores} />
         </Seccion>
       </div>
       <div className="grid gap-6 xl:grid-cols-2">
+        <Seccion
+          titulo="Composición de la cartera"
+          acciones={<BotonCsv filas={datos.composicion} nombre="composicion-cartera" />}
+        >
+          <ChartView spec={datos.graficos.composicion} />
+          <Tabla
+            filas={datos.composicion}
+            clave={(c) => c.clave}
+            columnas={[
+              { titulo: "Situación", valor: (c) => <SituacionContrato situacion={c.nombre} /> },
+              { titulo: "Contratos", valor: (c) => fmtNumero(c.contratos, 0), numero: true },
+              { titulo: "Recaudado", valor: (c) => gs(c.cobradoMM), numero: true },
+              { titulo: "Part.", valor: (c) => `${fmtNumero(c.participacionPct)}%`, numero: true },
+              {
+                titulo: "Mora / mes",
+                valor: (c) => `${fmtNumero(c.moraPctFacturacionMensual)}%`,
+                numero: true,
+              },
+            ]}
+          />
+          <p className="mt-2 text-xs text-muted-foreground">
+            El aporte mensual lo fija la administradora y depende solo de la situación: quien tiene
+            posesión de su unidad paga cerca de 3× quien todavía espera. La cuota media de los
+            activos hoy es de Gs {fmtNumero(r.cuotaMediaGs, 0)}.
+          </p>
+        </Seccion>
         <Seccion
           titulo="Planes"
           acciones={<BotonCsv filas={datos.planes} nombre="cartera-por-plan" />}
@@ -188,27 +217,24 @@ export function Territorio({ datos }: { datos: DatosDe<"territorio"> }) {
   );
 }
 
-export function Sucursales({ datos }: { datos: DatosDe<"sucursales"> }) {
+export function Asesores({ datos }: { datos: DatosDe<"asesores"> }) {
   const desercion = new Map(datos.desercion.map((d) => [d.clave, d]));
   return (
     <div className="space-y-6">
       <div className="grid gap-6 xl:grid-cols-2">
-        <Seccion titulo="Recaudación por sucursal">
-          <ChartView spec={datos.graficos.sucursales} />
+        <Seccion titulo="Recaudación por asesor">
+          <ChartView spec={datos.graficos.asesores} />
         </Seccion>
         <Seccion titulo="Cuota promedio por plan">
           <ChartView spec={datos.graficos.ticket} />
         </Seccion>
       </div>
-      <Seccion
-        titulo="Sucursales"
-        acciones={<BotonCsv filas={datos.sucursales} nombre="sucursales" />}
-      >
+      <Seccion titulo="Asesores" acciones={<BotonCsv filas={datos.asesores} nombre="asesores" />}>
         <Tabla
-          filas={datos.sucursales}
+          filas={datos.asesores}
           clave={(s) => s.clave}
           columnas={[
-            { titulo: "Sucursal", valor: (s) => s.nombre },
+            { titulo: "Asesor", valor: (s) => s.nombre },
             { titulo: "Recaudado", valor: (s) => gs(s.cobradoMM), numero: true },
             { titulo: "Part.", valor: (s) => `${fmtNumero(s.participacionPct)}%`, numero: true },
             {
@@ -216,7 +242,19 @@ export function Sucursales({ datos }: { datos: DatosDe<"sucursales"> }) {
               valor: (s) => <Variacion pct={s.variacionInteranualPct} />,
               numero: true,
             },
+            { titulo: "Contratos", valor: (s) => fmtNumero(s.contratos, 0), numero: true },
             { titulo: "Socios", valor: (s) => fmtNumero(s.socios, 0), numero: true },
+            {
+              // Parte de lo que recauda un asesor no es gestión: es el mix de su cartera, porque
+              // un contrato con posesión aporta cerca de 3× uno en espera.
+              titulo: "Con posesión",
+              valor: (s) =>
+                `${fmtNumero(s.conPosesion, 0)} (${fmtNumero(
+                  s.contratos ? (s.conPosesion / s.contratos) * 100 : 0,
+                  0,
+                )}%)`,
+              numero: true,
+            },
             {
               titulo: "Mora / mes",
               valor: (s) => `${fmtNumero(s.moraPctFacturacionMensual)}%`,
@@ -229,6 +267,11 @@ export function Sucursales({ datos }: { datos: DatosDe<"sucursales"> }) {
             },
           ]}
         />
+        <p className="mt-2 text-xs text-muted-foreground">
+          Antes de leer el ranking como desempeño, mirá la columna "Con posesión": un asesor con más
+          contratos entregados recauda más por el aporte, no necesariamente porque venda o cobre
+          mejor.
+        </p>
       </Seccion>
       <Seccion
         titulo="Canales de alta"
@@ -272,9 +315,9 @@ export function Mora({ datos }: { datos: DatosDe<"mora"> }) {
           hint={`Al cierre: ${fmtNumero(ultimo?.pctFacturacion)}% de lo emitido en el mes`}
         />
         <Kpi
-          label="Socios con atraso"
+          label="Contratos con atraso"
           value={fmtNumero(r.enMora, 0)}
-          hint={`${fmtNumero(r.moraSociosPct)}% de los activos`}
+          hint={`${fmtNumero(r.moraContratosPct)}% de los activos`}
         />
         <Kpi
           label="Efectividad de cobranza"
@@ -299,7 +342,7 @@ export function Mora({ datos }: { datos: DatosDe<"mora"> }) {
           clave={(t) => t.tramo}
           columnas={[
             { titulo: "Tramo", valor: (t) => t.nombre },
-            { titulo: "Socios", valor: (t) => fmtNumero(t.socios, 0), numero: true },
+            { titulo: "Contratos", valor: (t) => fmtNumero(t.socios, 0), numero: true },
             { titulo: "Cuotas", valor: (t) => fmtNumero(t.cuotas, 0), numero: true },
             { titulo: "Saldo", valor: (t) => gs(t.saldoMM), numero: true },
             {
@@ -335,6 +378,37 @@ export function Mora({ datos }: { datos: DatosDe<"mora"> }) {
           A las 7 cuotas impagas el contrato se cae. La mora se mide sobre el saldo pendiente al
           cierre, no como la diferencia entre emitido y cobrado del período: las regularizaciones de
           meses anteriores caen dentro de la ventana y la dejarían en casi cero.
+        </p>
+      </Seccion>
+      <Seccion
+        titulo="Mora por situación del contrato"
+        acciones={<BotonCsv filas={datos.porSituacion} nombre="mora-por-situacion" />}
+      >
+        <Tabla
+          filas={datos.porSituacion}
+          clave={(x) => x.situacion}
+          columnas={[
+            { titulo: "Situación", valor: (x) => <SituacionContrato situacion={x.situacion} /> },
+            { titulo: "Contratos", valor: (x) => fmtNumero(x.contratos, 0), numero: true },
+            {
+              titulo: "Cuota / mes",
+              valor: (x) => `Gs ${fmtNumero(x.cuotaMensualGs, 0)}`,
+              numero: true,
+            },
+            { titulo: "En mora", valor: (x) => fmtNumero(x.enMora, 0), numero: true },
+            { titulo: "% en mora", valor: (x) => `${fmtNumero(x.moraPct)}%`, numero: true },
+            { titulo: "Saldo", valor: (x) => gs(x.saldoMM), numero: true },
+            {
+              titulo: "Atraso medio",
+              valor: (x) => `${fmtNumero(x.atrasoPromedio)} cuotas`,
+              numero: true,
+            },
+          ]}
+        />
+        <p className="mt-2 text-xs text-muted-foreground">
+          La situación y el estado de pago son ejes independientes: quien ya tiene posesión también
+          puede atrasarse, y cuando lo hace el saldo pesa más porque su cuota es la alta. El
+          porcentaje va dentro de cada grupo, que son poblaciones distintas.
         </p>
       </Seccion>
     </div>
@@ -412,6 +486,28 @@ export function Desercion({ datos }: { datos: DatosDe<"desercion"> }) {
           />
         </Seccion>
       </div>
+      <Seccion
+        titulo="Deserción por situación del contrato"
+        acciones={<BotonCsv filas={datos.porSituacion} nombre="desercion-por-situacion" />}
+      >
+        <Tabla
+          filas={datos.porSituacion}
+          clave={(x) => x.clave}
+          columnas={[
+            { titulo: "Situación", valor: (x) => <SituacionContrato situacion={x.nombre} /> },
+            { titulo: "Contratos", valor: (x) => fmtNumero(x.socios, 0), numero: true },
+            { titulo: "Bajas", valor: (x) => fmtNumero(x.bajas, 0), numero: true },
+            { titulo: "Deserción", valor: (x) => `${fmtNumero(x.desercionPct)}%`, numero: true },
+            { titulo: "Cuota perdida", valor: (x) => gs(x.cuotaPerdidaMM), numero: true },
+            { titulo: "Meses hasta la baja", valor: (x) => x.mesesHastaLaBaja, numero: true },
+          ]}
+        />
+        <p className="mt-2 text-xs text-muted-foreground">
+          La situación es la que tenía el contrato cuando terminó: la baja si se cayó, el cierre del
+          calendario si sigue vivo. Así la pregunta que responde es si se abandona esperando la
+          unidad o ya viviendo en ella — no dónde está hoy quien se fue hace años.
+        </p>
+      </Seccion>
     </div>
   );
 }
@@ -505,7 +601,72 @@ export function Forecast({ datos }: { datos: DatosDe<"forecast"> }) {
         completos, e intervalo de predicción del 80% según el error del ajuste. Es una referencia,
         no una predicción validada ni un compromiso.
       </p>
+      <Entregas datos={datos.entregas} />
     </div>
+  );
+}
+
+/**
+ * Efecto de las entregas sobre la recaudación mensual. Va APARTE de la proyección de arriba a
+ * propósito: la proyección es tendencia + estacionalidad y no conoce el cronograma de obra,
+ * mientras que esto es aritmética sobre el calendario de entregas. Sumarlas en una sola curva
+ * daría una precisión que ninguno de los dos cálculos tiene.
+ */
+function Entregas({ datos }: { datos: DatosDe<"forecast">["entregas"] }) {
+  const e = datos.entregas;
+  const ultimo = e[e.length - 1];
+  return (
+    <Seccion
+      titulo="Efecto de las próximas entregas"
+      acciones={<BotonCsv filas={e} nombre="efecto-entregas" />}
+    >
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Kpi
+          label="Contratos esperando su entrega"
+          value={fmtNumero(datos.contratosPendientes, 0)}
+          hint="Adjudicados cuya torre todavía no se entregó"
+        />
+        <Kpi
+          label="Salto por contrato"
+          value={`Gs ${fmtNumero(datos.saltoPorContratoGs, 0)}`}
+          hint={`De Gs ${fmtNumero(datos.aporteEsperaGs, 0)} a Gs ${fmtNumero(datos.aportePosesionGs, 0)} al mes`}
+        />
+        <Kpi
+          label="Recaudación mensual adicional"
+          value={gs(ultimo?.acumuladoMensualMM)}
+          hint="Cuando se hayan entregado todas las torres del cronograma"
+        />
+      </div>
+      <div className="mt-6">
+        <Tabla
+          filas={e}
+          clave={(x) => x.periodo}
+          columnas={[
+            { titulo: "Entrega", valor: (x) => x.mes },
+            { titulo: "Proyectos", valor: (x) => x.proyectos.join(", ") },
+            { titulo: "Contratos", valor: (x) => fmtNumero(x.contratos, 0), numero: true },
+            { titulo: "Socios", valor: (x) => fmtNumero(x.socios, 0), numero: true },
+            {
+              titulo: "Más por mes",
+              valor: (x) => gs(x.incrementoMensualMM),
+              numero: true,
+            },
+            {
+              titulo: "Acumulado",
+              valor: (x) => gs(x.acumuladoMensualMM),
+              numero: true,
+            },
+          ]}
+        />
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">
+        Cuando se entrega una torre, sus contratos adjudicados toman posesión y pasan a la cuota
+        alta. Es aritmética sobre el cronograma, no una proyección estadística, así que
+        deliberadamente no está sumado a la curva de arriba: esa serie es tendencia y
+        estacionalidad, y no conoce el calendario de obra. Las fechas de entrega son del catálogo
+        público; el reparto de contratos por proyecto es ilustrativo.
+      </p>
+    </Seccion>
   );
 }
 
@@ -521,8 +682,8 @@ export function Estadistica({ datos }: { datos: DatosDe<"estadistica"> }) {
         </div>
         <div className="space-y-4 xl:col-span-2">
           <Kpi
-            label="Socios que aportan el 80%"
-            value={`${fmtNumero(c.n80, 0)} de ${fmtNumero(c.socios, 0)}`}
+            label="Contratos que aportan el 80%"
+            value={`${fmtNumero(c.n80, 0)} de ${fmtNumero(c.contratos, 0)}`}
           />
           <Kpi
             label="Peso de los 100 primeros"
@@ -585,17 +746,32 @@ type FilaSocio = DatosDe<"territorio">["seleccion"] extends { socios: (infer T)[
   ? T
   : never;
 
+/** Cómo viene pagando el contrato. Es independiente de la situación: uno con posesión puede
+ *  estar en mora, y antes eso quedaba tapado por el estado "Adjudicado". */
 export function EstadoSocio({ estado }: { estado: string }) {
   const clase =
-    estado === "Adjudicado"
-      ? "bg-[var(--series-1)]/15 text-[var(--series-1)]"
-      : estado === "En mora"
-        ? "bg-warning/15 text-warning"
-        : estado === "Desertado"
-          ? "bg-destructive/10 text-destructive"
-          : "bg-success/15 text-success";
+    estado === "En mora"
+      ? "bg-warning/15 text-warning"
+      : estado === "Baja"
+        ? "bg-destructive/10 text-destructive"
+        : "bg-success/15 text-success";
   return (
     <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${clase}`}>{estado}</span>
+  );
+}
+
+/** Dónde está el contrato en el camino hacia su unidad. */
+export function SituacionContrato({ situacion }: { situacion: string }) {
+  const clase =
+    situacion === "Con posesión"
+      ? "bg-[var(--series-2)]/15 text-[var(--series-2)]"
+      : situacion === "Adjudicado"
+        ? "bg-[var(--series-1)]/15 text-[var(--series-1)]"
+        : "bg-muted text-muted-foreground";
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${clase}`}>
+      {situacion}
+    </span>
   );
 }
 
@@ -623,7 +799,7 @@ export function TablaSocios({
           valor: (s) => <span className="font-mono text-xs">{s.contrato}</span>,
         },
         { titulo: "Plan", valor: (s) => s.plan },
-        { titulo: "Sucursal", valor: (s) => s.sucursal },
+        { titulo: "Asesor", valor: (s) => s.asesor },
         { titulo: "Alta", valor: (s) => s.altaEtiqueta },
         { titulo: "Antigüedad", valor: (s) => `${s.antiguedadMeses} m`, numero: true },
         { titulo: "Cuota", valor: (s) => `Gs ${fmtNumero(s.cuotaGs, 0)}`, numero: true },
@@ -638,7 +814,8 @@ export function TablaSocios({
             ),
           numero: true,
         },
-        { titulo: "Estado", valor: (s) => <EstadoSocio estado={s.estado} /> },
+        { titulo: "Situación", valor: (s) => <SituacionContrato situacion={s.situacion} /> },
+        { titulo: "Pago", valor: (s) => <EstadoSocio estado={s.estadoPago} /> },
       ]}
     />
   );

@@ -1,7 +1,7 @@
 // Construye los gráficos del catálogo desde los datos (solo servidor). Fide y las pantallas solo
 // eligen el gráfico y sus filtros: los valores salen siempre de acá.
 import type { ChartSpec, ParametrosGrafico } from "@/lib/charts";
-import { nombrePlan, type Plan, type Sucursal } from "@/lib/data/filtros";
+import { nombrePlan, type Plan, type Asesor } from "@/lib/data/filtros";
 import { normalizarFiltros } from "@/lib/data/filtros";
 import { proyectarSerie, serieConProyeccion } from "@/lib/data/forecast";
 import { etiquetaRango, PRIMER_PERIODO, ULTIMO_PERIODO } from "@/lib/data/periodos";
@@ -14,7 +14,8 @@ import {
   concentracion,
   porBarrio,
   porPlan,
-  porSucursal,
+  porAsesor,
+  porSituacion,
   serieMensualCartera,
   tramosAntiguedad,
   type FiltroCartera,
@@ -42,12 +43,12 @@ export function construirGrafico(p: ParametrosGrafico): ChartSpec {
     desde: p.desde,
     hasta: p.hasta,
     plan: p.plan,
-    sucursal: p.sucursal as Sucursal | undefined,
+    asesor: p.asesor as Asesor | undefined,
     barrio: p.barrio,
   });
   const f: FiltroCartera = base;
   const rangoTxt = etiquetaRango(f.desde, f.hasta);
-  const sufijo = `${f.plan ? ` · ${nombrePlan[f.plan]}` : ""}${f.sucursal ? ` · ${f.sucursal}` : ""}${f.barrio ? ` · ${f.barrio}` : ""} · ${rangoTxt}`;
+  const sufijo = `${f.plan ? ` · ${nombrePlan[f.plan]}` : ""}${f.asesor ? ` · ${f.asesor}` : ""}${f.barrio ? ` · ${f.barrio}` : ""} · ${rangoTxt}`;
   const titulo = (t: string) => p.titulo || t;
 
   const ilustrativo = (spec: Omit<ChartSpec, "id" | "fuente">): ChartSpec => ({
@@ -89,15 +90,27 @@ export function construirGrafico(p: ParametrosGrafico): ChartSpec {
         series: [{ clave: "cobradoMM", nombre: "Cobrado" }],
         pregunta: "¿Cómo se reparte la cartera entre los planes?",
       });
-    case "cartera_por_sucursal":
+    case "cartera_por_asesor":
       return ilustrativo({
-        titulo: titulo(`Recaudación por sucursal · ${rangoTxt}`),
+        titulo: titulo(`Recaudación por asesor · ${rangoTxt}`),
         tipo: "barras",
         unidad: "Gs MM",
         x: "nombre",
-        datos: porSucursal(f).slice(0, p.limite ?? 10),
+        datos: porAsesor(f).slice(0, p.limite ?? 12),
         series: [{ clave: "cobradoMM", nombre: "Cobrado" }],
-        pregunta: "Compará las sucursales por recaudación, altas y mora.",
+        pregunta: "Compará los asesores por recaudación, altas y mora.",
+      });
+    case "composicion_cartera":
+      return ilustrativo({
+        titulo: titulo(`Recaudación por situación del contrato · ${rangoTxt}`),
+        tipo: "barras",
+        unidad: "Gs MM",
+        x: "nombre",
+        datos: porSituacion(f),
+        series: [{ clave: "cobradoMM", nombre: "Cobrado" }],
+        nota: `Un contrato con posesión aporta cerca de 3× uno en espera, así que un grupo chico puede explicar una porción grande de la recaudación. ${NOTA_ILUSTRATIVA}`,
+        pregunta:
+          "¿De qué se compone la recaudación entre los que esperan y los que ya tienen su unidad?",
       });
     case "cartera_por_barrio":
       return ilustrativo({
@@ -111,7 +124,7 @@ export function construirGrafico(p: ParametrosGrafico): ChartSpec {
       });
     case "altas_bajas":
       return ilustrativo({
-        titulo: titulo(`Altas y bajas de socios${sufijo}`),
+        titulo: titulo(`Altas y bajas de contratos${sufijo}`),
         tipo: "barras",
         unidad: "socios",
         x: "mes",
@@ -131,19 +144,19 @@ export function construirGrafico(p: ParametrosGrafico): ChartSpec {
         x: "nombre",
         datos: porPlan(f).map((x) => ({
           ...x,
-          cuotaGs: x.socios ? Math.round((x.cobradoMM * 1_000_000) / x.socios / 9) : 0,
+          cuotaGs: x.contratos ? Math.round((x.cobradoMM * 1_000_000) / x.contratos / 9) : 0,
         })),
         series: [{ clave: "cuotaGs", nombre: "Cuota promedio" }],
         pregunta: "¿Cuál es el ticket promedio de cada plan?",
       });
     case "antiguedad_socios":
       return ilustrativo({
-        titulo: titulo("Socios activos por antigüedad"),
+        titulo: titulo("Contratos activos por antigüedad"),
         tipo: "barras",
-        unidad: "socios",
+        unidad: "contratos",
         x: "nombre",
         datos: tramosAntiguedad(f),
-        series: [{ clave: "socios", nombre: "Socios" }],
+        series: [{ clave: "contratos", nombre: "Contratos" }],
         pregunta: "¿Cómo se distribuye la antigüedad de la cartera?",
       });
     case "concentracion_cartera": {
@@ -152,10 +165,10 @@ export function construirGrafico(p: ParametrosGrafico): ChartSpec {
         titulo: titulo(`Concentración de la recaudación · ${rangoTxt}`),
         tipo: "area",
         unidad: "% del monto",
-        x: "sociosPct",
+        x: "contratosPct",
         datos: c.puntos,
         series: [{ clave: "montoPct", nombre: "% del monto acumulado" }],
-        nota: `${c.n80} de ${c.socios} socios aportan el 80% de la recaudación; los 100 primeros, el ${c.top100Pct}%. ${NOTA_ILUSTRATIVA}`,
+        nota: `${c.n80} de ${c.contratos} contratos aportan el 80% de la recaudación; los 100 primeros, el ${c.top100Pct}%. ${NOTA_ILUSTRATIVA}`,
         pregunta: "¿Qué tan concentrada está la recaudación?",
       });
     }

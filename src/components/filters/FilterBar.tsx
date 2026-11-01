@@ -8,17 +8,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { nombrePlan, nombresBarrios, planes, presetsPeriodo, sucursales } from "@/lib/data";
+import {
+  asesores,
+  nombrePlan,
+  nombresBarrios,
+  planes,
+  presetsPeriodo,
+  situaciones,
+} from "@/lib/data";
 import type { FiltrosUrl } from "@/lib/filtros-url";
 
 const TODOS = "__todos";
 
-export type CampoFiltro = "periodo" | "plan" | "sucursal" | "barrio";
+export type CampoFiltro = "periodo" | "plan" | "asesor" | "situacion" | "barrio";
 
 /** Barra de filtros en una fila sobre los gráficos; escribe en la URL de la página actual. */
 export function FilterBar({
   filtros,
-  mostrar = ["periodo", "plan", "sucursal"],
+  mostrar = ["periodo", "plan", "asesor"],
 }: {
   filtros: FiltrosUrl;
   mostrar?: CampoFiltro[];
@@ -34,7 +41,9 @@ export function FilterBar({
       },
       replace: true,
     } as never);
-  const activos = Boolean(filtros.p || filtros.plan || filtros.suc || filtros.barrio);
+  const activos = Boolean(
+    filtros.p || filtros.plan || filtros.ase || filtros.sit || filtros.barrio,
+  );
 
   return (
     <div
@@ -77,17 +86,35 @@ export function FilterBar({
           </SelectContent>
         </Select>
       )}
-      {mostrar.includes("sucursal") && (
+      {mostrar.includes("asesor") && (
         <Select
-          value={filtros.suc ?? TODOS}
-          onValueChange={(v) => set({ suc: v === TODOS ? undefined : (v as FiltrosUrl["suc"]) })}
+          value={filtros.ase ?? TODOS}
+          onValueChange={(v) => set({ ase: v === TODOS ? undefined : (v as FiltrosUrl["ase"]) })}
         >
-          <SelectTrigger className="h-9 w-48" aria-label="Sucursal">
+          <SelectTrigger className="h-9 w-44" aria-label="Asesor">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={TODOS}>Todas las sucursales</SelectItem>
-            {sucursales.map((s) => (
+            <SelectItem value={TODOS}>Todos los asesores</SelectItem>
+            {asesores.map((a) => (
+              <SelectItem key={a} value={a}>
+                Asesor {a}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+      {mostrar.includes("situacion") && (
+        <Select
+          value={filtros.sit ?? TODOS}
+          onValueChange={(v) => set({ sit: v === TODOS ? undefined : (v as FiltrosUrl["sit"]) })}
+        >
+          <SelectTrigger className="h-9 w-48" aria-label="Situación del contrato">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={TODOS}>Toda la cartera</SelectItem>
+            {situaciones.map((s) => (
               <SelectItem key={s} value={s}>
                 {s}
               </SelectItem>
@@ -118,7 +145,15 @@ export function FilterBar({
           variant="ghost"
           size="sm"
           className="text-muted-foreground"
-          onClick={() => set({ p: undefined, plan: undefined, suc: undefined, barrio: undefined })}
+          onClick={() =>
+            set({
+              p: undefined,
+              plan: undefined,
+              ase: undefined,
+              sit: undefined,
+              barrio: undefined,
+            })
+          }
         >
           <RotateCcw className="size-3.5" /> Limpiar
         </Button>

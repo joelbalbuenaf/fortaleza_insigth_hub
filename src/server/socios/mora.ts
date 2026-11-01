@@ -5,27 +5,35 @@
 //   - DESERCIÓN: contratos que ya se cayeron. Es un hecho consumado.
 //   - RIESGO: socios que todavía están, pero se parecen a los que desertaron. Es una predicción,
 //     y el scoring expone sus factores para que una persona pueda discutirla.
-import { nombrePlan, type Canal, type Plan } from "@/lib/data/filtros";
-import { etiquetaPeriodo, periodos, rango, desplazar } from "@/lib/data/periodos";
+import { nombrePlan, situaciones, type Canal, type Plan, type Situacion } from "@/lib/data/filtros";
+import { etiquetaPeriodo, periodos, rango, desplazar, ULTIMO_PERIODO } from "@/lib/data/periodos";
 import { redondear } from "@/lib/data/random";
 import {
   antiguedadMeses,
+  aporteDelMes,
   atrasoAl,
   ATRASO_LIMITE,
   cobradoEnRango,
   cuotasDe,
   emitido,
   esActivo,
-  socios,
-  type Socio,
+  contratos,
+  situacionDe,
+  type Contrato,
 } from "./datos";
 import { filtrar, PERIODO_ACTUAL, type FiltroCartera } from "./consultas";
 
 const mm = (guaranies: number, d = 0) => redondear(guaranies / 1_000_000, d);
 
+/** Contratos por persona, contado una sola vez: el scoring se corre sobre miles de contratos. */
+const contratosPorSocio = contratos.reduce(
+  (m, c) => m.set(c.socioId, (m.get(c.socioId) ?? 0) + 1),
+  new Map<string, number>(),
+);
+
 /** Cuota vigente del socio al cierre del período. */
-function cuotaVigente(s: Socio, hasta: string) {
-  return emitido(s, hasta) || s.aporteMensual;
+function cuotaVigente(s: Contrato, hasta: string) {
+  return emitido(s, hasta) || aporteDelMes(hasta, situacionDe(s, hasta) === "Con posesión");
 }
 
 // ── Mora por tramo de atraso ───────────────────────────────────────────────────────────
@@ -51,6 +59,34 @@ export function moraPorTramo(f: FiltroCartera = PERIODO_ACTUAL) {
       saldoMM: mm(lista.reduce((n, s) => n + atrasoAl(s, f.hasta) * cuotaVigente(s, f.hasta), 0)),
       // A más atraso, menos chance de recuperar: es el tramo que hay que atacar primero.
       riesgoDeCaida: t.min >= 5 ? "alto" : t.min >= 3 ? "medio" : "bajo",
+    };
+  });
+}
+
+/**
+ * Mora comparada por situación del contrato: ¿se atrasa más el que todavía espera su unidad o el
+ * que ya la recibió? Son poblaciones distintas — el que tiene posesión paga una cuota tres veces
+ * mayor y ya recibió lo que esperaba — así que el porcentaje se calcula dentro de cada grupo.
+ */
+export function moraPorSituacion(f: FiltroCartera = PERIODO_ACTUAL) {
+  const activos = filtrar(f).filter((s) => esActivo(s, f.hasta));
+  return situaciones.map((situacion) => {
+    const lista = activos.filter((s) => situacionDe(s, f.hasta) === situacion);
+    const enMora = lista.filter((s) => atrasoAl(s, f.hasta) >= 1);
+    const emi = lista.reduce((t, s) => t + emitido(s, f.hasta), 0);
+    const saldo = enMora.reduce((t, s) => t + atrasoAl(s, f.hasta) * cuotaVigente(s, f.hasta), 0);
+    return {
+      situacion,
+      contratos: lista.length,
+      enMora: enMora.length,
+      moraPct: lista.length ? redondear((enMora.length / lista.length) * 100, 1) : 0,
+      saldoMM: mm(saldo),
+      /** Saldo en mora sobre lo que ese grupo factura en el mes. */
+      pctFacturacion: emi ? redondear((saldo / emi) * 100, 1) : 0,
+      cuotaMensualGs: aporteDelMes(f.hasta, situacion === "Con posesión"),
+      atrasoPromedio: enMora.length
+        ? redondear(enMora.reduce((t, s) => t + atrasoAl(s, f.hasta), 0) / enMora.length, 1)
+        : 0,
     };
   });
 }
@@ -81,12 +117,12 @@ export function evolucionMora(f: FiltroCartera = PERIODO_ACTUAL) {
  */
 export function cohortesDesercion() {
   const ultimo = periodos[periodos.length - 1]!;
-  const anios = [...new Set(socios.map((s) => Number(s.alta.slice(0, 4))))]
+  const anios = [...new Set(contratos.map((s) => Number(s.alta.slice(0, 4))))]
     .filter((a) => a >= 2022)
     .sort();
 
   return anios.map((anio) => {
-    const cohorte = socios.filter((s) => Number(s.alta.slice(0, 4)) === anio);
+    const cohorte = contratos.filter((s) => Number(s.alta.slice(0, 4)) === anio);
     const hito = (meses: number) => {
       // ¿Toda la cohorte llegó a cumplir ese hito dentro del calendario?
       const corte = desplazar(`${anio}-12`, meses);
@@ -109,21 +145,33 @@ export function cohortesDesercion() {
   });
 }
 
-/** Deserción agrupada por una dimensión del socio, para ver dónde se pierde más. */
-export function desercionPor(dimension: "plan" | "canal" | "sucursal") {
-  const claves = [...new Set(socios.map((s) => s[dimension]))].sort();
+/** Deserción agrupada por una dimensión del socio, para ver dónde se pierde más.
+ *
+ *  Para `situacion` se toma la del contrato en el momento en que terminó — la baja si se cayó, el
+ *  cierre del calendario si sigue vivo — porque la pregunta es si se desertó esperando la unidad o
+ *  ya viviendo en ella, y no dónde está hoy el que se fue hace tres años. */
+export type DimensionDesercion = "plan" | "canal" | "asesor" | "situacion";
+
+const claveDesercion = (s: Contrato, dimension: DimensionDesercion) =>
+  dimension === "situacion" ? situacionDe(s, s.baja ?? ULTIMO_PERIODO) : String(s[dimension]);
+
+export function desercionPor(dimension: DimensionDesercion) {
+  const claves =
+    dimension === "situacion"
+      ? [...situaciones]
+      : [...new Set(contratos.map((s) => claveDesercion(s, dimension)))].sort();
   return claves
     .map((clave) => {
-      const lista = socios.filter((s) => s[dimension] === clave);
+      const lista = contratos.filter((s) => claveDesercion(s, dimension) === clave);
       const bajas = lista.filter((s) => s.baja);
       return {
         clave: String(clave),
         nombre: dimension === "plan" ? nombrePlan[clave as Plan] : String(clave),
         socios: lista.length,
         bajas: bajas.length,
-        desercionPct: redondear((bajas.length / lista.length) * 100, 1),
+        desercionPct: lista.length ? redondear((bajas.length / lista.length) * 100, 1) : 0,
         /** Cuánto aportaba por mes lo que se perdió. */
-        cuotaPerdidaMM: mm(bajas.reduce((t, s) => t + s.aporteMensual, 0)),
+        cuotaPerdidaMM: mm(bajas.reduce((t, s) => t + cuotaVigente(s, s.baja!), 0)),
         /** Antigüedad típica al momento de la baja. */
         mesesHastaLaBaja: bajas.length
           ? Math.round(bajas.reduce((t, s) => t + antiguedadMeses(s, s.baja!), 0) / bajas.length)
@@ -142,7 +190,7 @@ const RIESGO_CANAL: Record<Canal, number> = {
   Web: 14,
   Eventos: 10,
   "App Fideliza": 6,
-  Asesor: 2,
+  Oficina: 2,
   Referido: 0,
 };
 
@@ -151,7 +199,7 @@ const RIESGO_CANAL: Record<Canal, number> = {
  * suma de factores explícitos, elegidos porque son los que mueven la deserción en estos datos.
  * Se muestra con sus factores justamente para que se pueda discutir cada uno.
  */
-export function riesgoDeSocio(s: Socio, hasta: string) {
+export function riesgoDeSocio(s: Contrato, hasta: string) {
   const atraso = atrasoAl(s, hasta);
   const antiguedad = antiguedadMeses(s, hasta);
   const { emitidas, pagadas } = cuotasDe(s, hasta);
@@ -162,12 +210,16 @@ export function riesgoDeSocio(s: Socio, hasta: string) {
   const fCumplimiento = Math.min(20, Math.round((1 - cumplimiento) * 60));
   const fCanal = RIESGO_CANAL[s.canal];
   const fPlan = s.plan === "Amplia" ? 6 : s.plan === "Adicional" ? 3 : 0;
-  // Ya adjudicado: tiene mucho más que perder, así que el riesgo baja.
-  const fAdjudicado = s.adjudicado && s.adjudicado <= hasta ? -18 : 0;
+  // La situación tira para los dos lados y conviene verlo separado: quien ya tiene su unidad
+  // tiene mucho más que perder (baja el riesgo), pero su cuota es cerca de 3× la de espera y
+  // sostenerla es más difícil (lo sube). Se exponen como dos factores, no como uno neto.
+  const situacion = situacionDe(s, hasta);
+  const fSituacion = situacion === "Con posesión" ? -22 : situacion === "Adjudicado" ? -18 : 0;
+  const fCuotaAlta = situacion === "Con posesión" ? 10 : 0;
 
   const puntaje = Math.max(
     0,
-    Math.min(100, fAtraso + fAntiguedad + fCumplimiento + fCanal + fPlan + fAdjudicado),
+    Math.min(100, fAtraso + fAntiguedad + fCumplimiento + fCanal + fPlan + fSituacion + fCuotaAlta),
   );
 
   const factores: FactorRiesgo[] = [
@@ -201,13 +253,30 @@ export function riesgoDeSocio(s: Socio, hasta: string) {
       aporte: fPlan,
       explicacion: "La cuota más alta del Plan Amplia es más difícil de sostener.",
     },
-    ...(fAdjudicado
+    ...(fSituacion
       ? [
           {
-            nombre: "Ya adjudicado",
-            valor: etiquetaPeriodo(s.adjudicado!),
-            aporte: fAdjudicado,
-            explicacion: "Quien ya recibió su unidad tiene mucho más que perder si abandona.",
+            nombre: "Situación",
+            valor:
+              situacion === "Con posesión"
+                ? `Con posesión desde ${etiquetaPeriodo(s.posesion!)}`
+                : `Adjudicado en ${etiquetaPeriodo(s.adjudicado!)}`,
+            aporte: fSituacion,
+            explicacion:
+              situacion === "Con posesión"
+                ? "Ya vive en su unidad: es quien más tiene que perder si abandona."
+                : "Ya tiene unidad asignada y espera la entrega: tiene mucho más que perder.",
+          },
+        ]
+      : []),
+    ...(fCuotaAlta
+      ? [
+          {
+            nombre: "Cuota de posesión",
+            valor: `Gs ${cuotaVigente(s, hasta).toLocaleString("es-PY")} al mes`,
+            aporte: fCuotaAlta,
+            explicacion:
+              "El aporte con posesión es cerca de 3× el de espera, y sostenerlo es más difícil.",
           },
         ]
       : []),
@@ -215,8 +284,12 @@ export function riesgoDeSocio(s: Socio, hasta: string) {
 
   return {
     contrato: s.contrato,
+    socioId: s.socioId,
+    /** Contratos que tiene la misma persona: contactarla es una sola gestión, no varias. */
+    contratosDelSocio: contratosPorSocio.get(s.socioId) ?? 1,
     plan: s.plan,
-    sucursal: s.sucursal,
+    asesor: s.asesor,
+    situacion,
     canal: s.canal,
     barrio: s.barrio,
     atraso,

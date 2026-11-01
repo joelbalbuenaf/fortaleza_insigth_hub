@@ -8,7 +8,7 @@ import {
   Forecast,
   Mora,
   Resumen,
-  Sucursales,
+  Asesores,
   Territorio,
 } from "@/components/cartera/Pestanas";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,7 @@ import { validarFiltrosUrl, type FiltrosUrl } from "@/lib/filtros-url";
 const pestanas: { id: TabCartera; label: string }[] = [
   { id: "resumen", label: "Resumen" },
   { id: "territorio", label: "Territorio" },
-  { id: "sucursales", label: "Sucursales y canales" },
+  { id: "asesores", label: "Asesores y canales" },
   { id: "mora", label: "Mora" },
   { id: "desercion", label: "Deserción" },
   { id: "forecast", label: "Forecast" },
@@ -28,10 +28,10 @@ const pestanas: { id: TabCartera; label: string }[] = [
 ];
 
 const filtrosPorPestana: Record<TabCartera, CampoFiltro[]> = {
-  resumen: ["periodo", "plan", "sucursal"],
+  resumen: ["periodo", "plan", "asesor", "situacion"],
   territorio: ["periodo", "plan"],
-  sucursales: ["periodo", "plan"],
-  mora: ["periodo", "plan", "sucursal"],
+  asesores: ["periodo", "plan", "situacion"],
+  mora: ["periodo", "plan", "asesor", "situacion"],
   desercion: [],
   forecast: ["plan"],
   estadistica: ["periodo", "plan"],
@@ -59,7 +59,7 @@ export const Route = createFileRoute("/cartera")({
       {
         name: "description",
         content:
-          "Recaudación del Sistema de Ahorro: territorio, sucursales, mora, deserción y forecast.",
+          "Recaudación del Sistema de Ahorro: composición entre espera y posesión, territorio, asesores, mora, deserción y forecast.",
       },
     ],
   }),
@@ -124,7 +124,7 @@ function Page() {
         </Tabs>
         {datos.tab === "resumen" && <Resumen datos={datos} />}
         {datos.tab === "territorio" && <Territorio datos={datos} />}
-        {datos.tab === "sucursales" && <Sucursales datos={datos} />}
+        {datos.tab === "asesores" && <Asesores datos={datos} />}
         {datos.tab === "mora" && <Mora datos={datos} />}
         {datos.tab === "desercion" && <Desercion datos={datos} />}
         {datos.tab === "forecast" && <Forecast datos={datos} />}

@@ -31,17 +31,33 @@ Esto es público, del sitio de Fortaleza, y es lo que el Hub modela:
   **licitación** (se abren los sobres ante escribano y gana la mejor oferta, que combina los
   pagos realizados con los puntos de beneficios).
 - El plazo máximo para recibir la unidad en Asunción es de **20 años**. Los planes son Plan
-  Amplia, Plan 20 y productos adicionales.
+  Amplia, Plan 20 y productos adicionales, y los tres adjudican con el mismo mecanismo.
+
+Sobre eso, el equipo de Fortaleza aportó cómo se compone el aporte (esto no sale del sitio):
+
+- Un contrato recorre tres **situaciones**: *En espera* → *Adjudicado* → *Con posesión*. La
+  posesión llega con la entrega de la torre, no con la adjudicación.
+- La administradora fija el aporte mensual, y depende **solo de la situación**: hoy
+  **Gs 1.655.000** en espera y **Gs 5.000.000** con posesión. La cuota con posesión no lleva
+  interés: es más alta, no un financiamiento.
+- La situación es **independiente del estado de pago**: un contrato con posesión también puede
+  estar en mora.
+- La cuota es fija por contrato, pero **un socio puede tener varios contratos**: el Hub cuenta
+  contratos y personas por separado.
+- El contrato lo trae y lo sigue un **asesor** (por código, A-01 … A-45); el **canal de alta**
+  (Oficina, Web, Referido, App Fideliza, Eventos) es por dónde entró el socio.
 
 De ahí sale el eje analítico: la métrica central es la **cartera de aportes** (recaudación,
-crecimiento, mora, deserción), no la venta de unidades.
+crecimiento, mora, deserción), no la venta de unidades. Y la composición entre espera y posesión
+es la lectura que explica de dónde sale la plata: con el aporte de posesión tres veces mayor, un
+grupo chico de contratos puede aportar una porción grande de la recaudación.
 
 ## Qué incluye
 
 | Área | Contenido |
 | --- | --- |
 | Inicio | KPIs de la cartera (Ene–Sep 2026 vs. 2025), centro de alertas calculadas, accesos a módulos y reportes |
-| Cartera de aportes | Resumen, territorio por barrio, sucursales y canales, mora, deserción por cohorte, forecast con backtest, estadística |
+| Cartera de aportes | Resumen con la composición entre espera y posesión, territorio por barrio, asesores y canales, mora (por tramo y por situación), deserción por cohorte, forecast con backtest y el efecto de las entregas, estadística |
 | Socios | Los contratos de la cartera: búsqueda, filtros, ficha con serie de 57 meses y posición en la cola de licitación |
 | Proyectos y obra | Catálogo público en el mapa de Asunción, avance contra cronograma, mix por tipología |
 | Mercado | Precio de m² por barrio, competencia por desarrolladora, absorción, barrios sin presencia |
@@ -115,7 +131,8 @@ Con Docker: `docker build -t fortaleza-hub . && docker run -p 3000:3000 -e HUB_U
 
 ```
 src/server/          SOLO SERVIDOR (la import-protection de Vite lo bloquea en el navegador):
-  socios/datos.ts    la cartera: un socio por contrato, con emitido/cobrado/atraso por mes
+  socios/datos.ts    la cartera: un CONTRATO por fila (varios por socio), su situación y sus
+                     series de emitido/cobrado/atraso mes a mes
   socios/consultas.ts resumen, series, desgloses, ranking, ficha, concentración, atípicos
   socios/mora.ts     tramos de atraso, cohortes de deserción, scoring de riesgo con factores
   adjudicaciones.ts  sorteo y licitación, espera por cohorte, simulación del próximo acto
@@ -134,8 +151,9 @@ scripts/             golden-cuotero.py: genera las referencias del simulador des
 ```
 
 **Reglas de datos** (ver `AGENTS.md`): aportes en guaraníes, mostrados en millones (Gs MM);
-socios, unidades y adjudicaciones son conteos y nunca se suman con montos; la mora se mide sobre
-el saldo pendiente al cierre, no como emitido − cobrado de una ventana; cada gráfico y pantalla
+contratos, socios, unidades y adjudicaciones son conteos y nunca se suman con montos; situación y
+estado de pago son dos ejes independientes; la mora se mide sobre el saldo pendiente al cierre, no
+como emitido − cobrado de una ventana; cada gráfico y pantalla
 lleva su insignia de fuente. El build falla si código de cliente importa `src/server/`.
 
 El simulador de planes (`src/lib/fide/simulador.ts`) es un **porteo del cuotero Flask** del

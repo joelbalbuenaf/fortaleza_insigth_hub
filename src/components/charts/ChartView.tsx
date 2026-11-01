@@ -184,6 +184,13 @@ export function ChartView({
     );
   } else {
     const barras = spec.tipo === "barras";
+    // El eje Y se ensancha con la magnitud: una cuota en guaraníes son nueve caracteres
+    // ("2.200.000") y con el ancho fijo de antes quedaba cortada por la izquierda.
+    const maximoY = Math.max(
+      0,
+      ...spec.datos.flatMap((d) => spec.series.map((se) => Math.abs(Number(d[se.clave]) || 0))),
+    );
+    const anchoY = maximoY >= 1_000_000 ? 76 : maximoY >= 100_000 ? 62 : 52;
     const eje = disposicionEjeX(
       spec.datos.map((d) => String(d[spec.x] ?? "")),
       ancho,
@@ -206,7 +213,7 @@ export function ChartView({
           height={eje.alto}
         />
         <YAxis
-          width={52}
+          width={anchoY}
           {...ejes}
           // Con valores chicos (un operador retira < 1 ML/mes) hacen falta decimales en el eje.
           tickFormatter={(v) => fmtNumero(v, Math.abs(v) < 10 ? 2 : 0)}

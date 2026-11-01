@@ -1,23 +1,33 @@
-// Filtros globales en la URL (?p=ytd&plan=Amplia&suc=Villa+Morra&barrio=Recoleta): links compartibles.
+// Filtros globales en la URL (?p=ytd&plan=Amplia&ase=A-07&sit=Con+posesión): links compartibles.
 import {
+  asesores,
   nombresBarrios,
   normalizarFiltros,
   planes,
   presetsPeriodo,
-  sucursales,
+  situaciones,
+  type Asesor,
   type FiltrosCartera,
   type Plan,
-  type Sucursal,
+  type Situacion,
 } from "@/lib/data";
 
-export type FiltrosUrl = { p?: string; plan?: Plan; suc?: Sucursal; barrio?: string };
+export type FiltrosUrl = {
+  p?: string;
+  plan?: Plan;
+  ase?: Asesor;
+  sit?: Situacion;
+  barrio?: string;
+};
 
 export function validarFiltrosUrl(search: Record<string, unknown>): FiltrosUrl {
   const out: FiltrosUrl = {};
   if (typeof search["p"] === "string" && presetsPeriodo.some((x) => x.id === search["p"]))
     out.p = search["p"];
   if (planes.includes(search["plan"] as Plan)) out.plan = search["plan"] as Plan;
-  if (sucursales.includes(search["suc"] as Sucursal)) out.suc = search["suc"] as Sucursal;
+  if (typeof search["ase"] === "string" && asesores.includes(search["ase"]))
+    out.ase = search["ase"];
+  if (situaciones.includes(search["sit"] as Situacion)) out.sit = search["sit"] as Situacion;
   if (typeof search["barrio"] === "string" && nombresBarrios.includes(search["barrio"]))
     out.barrio = search["barrio"];
   return out;
@@ -29,7 +39,8 @@ export function aFiltrosCartera(f: FiltrosUrl): FiltrosCartera {
     desde: preset?.desde,
     hasta: preset?.hasta,
     plan: f.plan,
-    sucursal: f.suc,
+    asesor: f.ase,
+    situacion: f.sit,
     barrio: f.barrio,
   });
 }
