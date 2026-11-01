@@ -2,7 +2,8 @@ import { useState, type FormEvent } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Eye, EyeOff, Loader2, LockKeyhole } from "lucide-react";
 import fide from "@/assets/fide.svg";
-import logoFortaleza from "@/assets/logo-fortaleza.svg";
+import logoFortaleza from "@/assets/logo-fortaleza.png";
+import logoFortalezaBlanco from "@/assets/logo-fortaleza-blanco.png";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -49,15 +50,13 @@ function Login() {
     <main className="grid min-h-dvh bg-background lg:grid-cols-2">
       <section className="bg-hero relative hidden flex-col justify-between overflow-hidden p-12 text-white lg:flex">
         <div className="absolute inset-x-0 top-0 h-1.5 bg-brand-stripe" />
-        <div className="w-56 rounded-xl bg-white p-4">
-          <img
-            src={logoFortaleza}
-            alt="Fortaleza Inmuebles"
-            width={225}
-            height={68}
-            className="h-auto w-full"
-          />
-        </div>
+        <img
+          src={logoFortalezaBlanco}
+          alt="Fortaleza Inmuebles"
+          width={185}
+          height={62}
+          className="h-14 w-auto self-start"
+        />
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-sidebar-primary">
             Fortaleza Inmuebles S.A.
@@ -85,15 +84,13 @@ function Login() {
       <section className="flex items-center justify-center p-6">
         <div className="w-full max-w-sm">
           <div className="mb-8 lg:hidden">
-            <div className="w-44 rounded-lg border bg-white p-3">
-              <img
-                src={logoFortaleza}
-                alt="Fortaleza Inmuebles"
-                width={225}
-                height={68}
-                className="h-auto w-full"
-              />
-            </div>
+            <img
+              src={logoFortaleza}
+              alt="Fortaleza Inmuebles"
+              width={185}
+              height={62}
+              className="h-11 w-auto self-start"
+            />
           </div>
           <span className="grid size-12 place-items-center rounded-xl bg-secondary text-primary dark:text-sidebar-primary">
             <LockKeyhole className="size-6" />

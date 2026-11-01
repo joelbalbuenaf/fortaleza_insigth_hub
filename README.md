@@ -152,6 +152,27 @@ Mapas: MapLibre GL con teselas de OpenFreeMap (no requiere key).
 
 ## Marca
 
-Los colores viven en tokens CSS (`src/styles.css`, bloques `:root` y `.dark`). Los logos de
-`src/assets/` son **placeholders en SVG**: reemplazar `logo-fortaleza.svg` por el logo oficial y
-`fide.svg` por el avatar definitivo del agente.
+Los colores y los logos son los oficiales de Fortaleza, tomados de su sitio el 31/10/2026:
+
+| Token | Color | Uso |
+| --- | --- | --- |
+| Primario | `#00544d` verde petróleo | Barra lateral, botones, títulos |
+| Acento | `#faa61a` dorado | Estado activo, llamados a la acción, regla de las diapositivas |
+| Secundario | `#f26522` naranja | Advertencias |
+| Alerta | `#f44404` | Errores y severidad alta |
+| Verde claro | `#35926a` | Series de marca y positivos |
+
+La franja de marca (`bg-brand-stripe`) reproduce los cuatro cuadrantes del isotipo: verde, teal,
+dorado y naranja. Todo vive en tokens CSS (`src/styles.css`, bloques `:root` y `.dark`), así que
+cambiar la paleta es editar un solo lugar.
+
+Los logos están en `src/assets/`: `logo-fortaleza.png` (color, para fondos claros) y
+`logo-fortaleza-blanco.png` (para fondos oscuros: barra lateral, login y diapositivas oscuras).
+El favicon es el oficial del sitio.
+
+**La paleta categórica de los gráficos (`--series-1` … `--series-5`) no es la de marca** y es a
+propósito: está validada para daltonismo, banda de luminosidad y contraste. Mezclarla con los
+colores institucionales haría que dos series distintas se confundan entre sí.
+
+`src/assets/fide.svg` sí es provisorio: es un avatar armado con la paleta de Fortaleza, a
+reemplazar cuando exista el definitivo del agente.

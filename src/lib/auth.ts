@@ -12,7 +12,7 @@ const PUBLICAS = [
   "/api/login",
   "/api/logout",
   "/api/salud",
-  "/favicon.svg",
+  "/favicon.png",
   "/robots.txt",
 ];
 export const esRutaPublica = (pathname: string) => PUBLICAS.includes(pathname);

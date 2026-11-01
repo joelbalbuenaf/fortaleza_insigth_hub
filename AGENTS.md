@@ -49,4 +49,11 @@
   de la cartera**: es el lugar donde un número inventado se confunde con un dato.
 - Mapas: MapLibre GL con teselas OpenFreeMap (sin key). Los proyectos y los socios se ubican en
   el centro del barrio con un desplazamiento chico, no en su dirección real.
-- Los logos de `src/assets/` son placeholders en SVG hasta que lleguen los oficiales.
+- **Marca**: paleta oficial de Fortaleza en tokens CSS (`#00544d` primario, `#faa61a` acento,
+  `#f26522` secundario). Los logos oficiales están en `src/assets/logo-fortaleza.png` (color) y
+  `logo-fortaleza-blanco.png` (fondos oscuros). La paleta de series de los gráficos
+  (`--series-*`) NO es la de marca a propósito: está validada para daltonismo y contraste.
+  `src/assets/fide.svg` es el único placeholder que queda.
+- Las diapositivas usan un lienzo fijo de 1920×1080 con `overflow: hidden`: si el contenido
+  desborda, el pie desaparece sin avisar. Al editarlas, medir el `scrollHeight` del
+  `.slide-content` contra su `clientHeight`.

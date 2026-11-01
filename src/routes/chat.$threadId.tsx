@@ -31,7 +31,7 @@ import {
   type Thread,
 } from "@/lib/threads";
 import logo from "@/assets/fide.svg";
-import logoFortaleza from "@/assets/logo-fortaleza.svg";
+import logoFortaleza from "@/assets/logo-fortaleza.png";
 
 export const Route = createFileRoute("/chat/$threadId")({
   head: () => ({

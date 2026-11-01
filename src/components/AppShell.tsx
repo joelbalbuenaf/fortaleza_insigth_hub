@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import logo from "@/assets/fide.svg";
-import logoFortaleza from "@/assets/logo-fortaleza.svg";
+import logoFortalezaBlanco from "@/assets/logo-fortaleza-blanco.png";
 import { CommandPalette, abrirPaleta } from "@/components/CommandPalette";
 import { FuenteBadge, type FuenteDato } from "@/components/FuenteBadge";
 import { SesionUsuario } from "@/components/SesionUsuario";
@@ -44,15 +44,13 @@ export function AppShell({ children }: { children: ReactNode }) {
       <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground md:flex print:hidden">
         <div className="h-1.5 bg-brand-stripe" />
         <div className="px-5 pb-4 pt-5">
-          <div className="rounded-lg bg-white p-3">
-            <img
-              src={logoFortaleza}
-              alt="Fortaleza Inmuebles"
-              width={225}
-              height={68}
-              className="h-auto w-full"
-            />
-          </div>
+          <img
+            src={logoFortalezaBlanco}
+            alt="Fortaleza Inmuebles"
+            width={185}
+            height={62}
+            className="h-11 w-auto self-start"
+          />
           <p className="mt-3 font-display text-xs font-bold uppercase tracking-widest text-sidebar-primary">
             Hub Analítico
           </p>
@@ -108,11 +106,11 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <nav className="flex items-center gap-2 overflow-x-auto bg-sidebar p-3 md:hidden print:hidden">
           <img
-            src={logoFortaleza}
+            src={logoFortalezaBlanco}
             alt="Fortaleza Inmuebles"
             width={90}
-            height={27}
-            className="h-7 w-auto rounded bg-white p-0.5"
+            height={30}
+            className="h-7 w-auto shrink-0"
           />
           {navTodo.map(({ to, label }) => (
             <Link
